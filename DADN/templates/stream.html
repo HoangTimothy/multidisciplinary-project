@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32-CAM Live Detection</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            text-align: center;
+            border-bottom: 3px solid #555;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 8px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 20px;
+            padding: 25px;
+        }
+
+        .video-section {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .video-container {
+            position: relative;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            aspect-ratio: 16/10;
+        }
+
+        #video {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .status-bar {
+            background: #f5f5f5;
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            justify-content: space-around;
+            border-left: 4px solid #667eea;
+        }
+
+        .status-item {
+            text-align: center;
+        }
+
+        .status-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .status-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+            margin-top: 5px;
+        }
+
+        .status-value.fps {
+            color: #667eea;
+        }
+
+        .status-value.inference {
+            color: #764ba2;
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .panel {
+            background: #f9f9f9;
+            border-radius: 10px;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .panel-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 8px;
+        }
+
+        .info-item {
+            font-size: 13px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .info-label {
+            color: #666;
+            font-weight: 500;
+        }
+
+        .info-value {
+            color: #333;
+            font-weight: 600;
+            text-align: right;
+            max-width: 120px;
+            word-break: break-all;
+        }
+
+        .alert-panel {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+            color: white;
+            border: none;
+        }
+
+        .alert-panel .panel-title {
+            border-bottom-color: rgba(255, 255, 255, 0.3);
+            color: white;
+        }
+
+        .alert-panel .info-label {
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .alert-panel .info-value {
+            color: white;
+        }
+
+        .alert-empty {
+            text-align: center;
+            color: rgba(255, 255, 255, 0.6);
+            padding: 10px 0;
+            font-size: 12px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            flex: 1;
+            min-width: 100px;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-danger {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #ee5a6f;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(102, 126, 234, 0.1);
+            border-radius: 50%;
+            border-top-color: #667eea;
+            animation: spin 0.8s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 22px;
+            }
+
+            .status-bar {
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎥 ESP32-CAM Live Object Detection</h1>
+            <p>Real-time obstacle detection with EfficientDet-Lite0</p>
+        </div>
+
+        <div class="main-content">
+            <div class="video-section">
+                <div class="video-container">
+                    <img id="video" src="/video_feed" alt="Live Stream">
+                </div>
+
+                <div class="status-bar">
+                    <div class="status-item">
+                        <div class="status-label">Live FPS</div>
+                        <div class="status-value fps" id="fps">0</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">Frames</div>
+                        <div class="status-value" id="frames">0</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">Inferences</div>
+                        <div class="status-value inference" id="inferences">0</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">Inference Time</div>
+                        <div class="status-value" id="inf-time">0ms</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar">
+                <div class="panel">
+                    <div class="panel-title">📊 System Stats</div>
+                    <div class="info-item">
+                        <span class="info-label">Resolution:</span>
+                        <span class="info-value" id="resolution">640x480</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Inference Rate:</span>
+                        <span class="info-value" id="inf-rate">Every 3 frames</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">JPEG Quality:</span>
+                        <span class="info-value" id="jpeg-quality">70%</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Model:</span>
+                        <span class="info-value" id="model">EfficientDet-Lite0</span>
+                    </div>
+                </div>
+
+                <div class="panel alert-panel" id="alert-panel">
+                    <div class="panel-title">⚠️ Last Alert</div>
+                    <div id="alert-content" class="alert-empty">No alerts yet</div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-title">🎛️ Controls</div>
+                    <div class="controls">
+                        <button class="btn-primary" onclick="refreshStats()">Refresh</button>
+                        <button class="btn-danger" onclick="clearStats()">Clear</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Auto-refresh stats every 1 second
+        setInterval(updateStats, 1000);
+
+        async function updateStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const data = await response.json();
+
+                // Update status bar
+                document.getElementById('fps').textContent = data.current_fps.toFixed(1);
+                document.getElementById('frames').textContent = data.frame_count;
+                document.getElementById('inferences').textContent = data.inference_count;
+                document.getElementById('inf-time').textContent = data.avg_inference_time_ms.toFixed(1) + 'ms';
+
+                // Update config info
+                if (data.config) {
+                    document.getElementById('resolution').textContent =
+                        `${data.config.frame_size[0]}x${data.config.frame_size[1]}`;
+                    document.getElementById('inf-rate').textContent =
+                        `Every ${data.config.inference_every_n_frames} frames`;
+                    document.getElementById('jpeg-quality').textContent =
+                        `${data.config.jpeg_quality}%`;
+                }
+
+                // Update alert
+                const alertPanel = document.getElementById('alert-content');
+                if (data.last_alert) {
+                    const alert = data.last_alert;
+                    alertPanel.innerHTML = `
+                        <div class="info-item">
+                            <span class="info-label">Object:</span>
+                            <span class="info-value">${alert.label}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Distance:</span>
+                            <span class="info-value">${alert.distance}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Zone:</span>
+                            <span class="info-value">${alert.zone}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Priority:</span>
+                            <span class="info-value">${alert.priority.toFixed(2)}</span>
+                        </div>
+                    `;
+                } else {
+                    alertPanel.innerHTML = '<div class="alert-empty">No obstacles detected</div>';
+                }
+            } catch (error) {
+                console.error('Error updating stats:', error);
+            }
+        }
+
+        function refreshStats() {
+            updateStats();
+            alert('Stats refreshed!');
+        }
+
+        function clearStats() {
+            // In production, you'd call an API endpoint to clear stats
+            alert('Clear functionality not implemented yet');
+        }
+
+        // Initial stats update
+        updateStats();
+    </script>
+</body>
+
+</html>
