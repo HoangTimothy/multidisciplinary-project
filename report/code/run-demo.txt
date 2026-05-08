@@ -1,0 +1,11 @@
+ESP32-CAM side:
+  cd ESP32_CAM_Project
+  python auto_camera_ngrok.py
+
+DADN inference/dashboard side:
+  cd DADN
+  python run_stream_server.py --camera-url https://xxxx.ngrok-free.app/stream
+
+Public dashboard side:
+  cd DADN
+  python expose_dashboard_ngrok.py --camera-url https://xxxx.ngrok-free.app/stream
