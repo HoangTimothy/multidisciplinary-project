@@ -40,7 +40,7 @@ static const int SERVER_PORT = 5000;
 #define STREAM_PORT 8081
 #define STATUS_LED 33
 #define ALERT_LED 4
-#define JPEG_QUALITY 12
+#define JPEG_QUALITY 20
 #define STREAM_TIMEOUT_MS 10000
 #define SEND_TO_SERVER_INTERVAL_MS 1000
 
@@ -160,7 +160,7 @@ void handleStream()
     client.write((const uint8_t *)"\r\n", 2);
     esp_camera_fb_return(fb);
 
-    delay(40);
+    delay(100);
   }
 
   client.stop();

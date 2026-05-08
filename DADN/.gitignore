@@ -7,6 +7,9 @@ __pycache__/
 
 # Model artifacts (download at runtime)
 models/
+.camera-ngrok-url
+.dadn-dashboard-url
+.dadn-dashboard-ngrok.json
 
 # OS/editor
 .DS_Store

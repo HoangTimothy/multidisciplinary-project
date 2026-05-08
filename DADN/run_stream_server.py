@@ -8,6 +8,37 @@ import os
 import sys
 import argparse
 from pathlib import Path
+from typing import Optional
+from urllib.parse import urlparse
+
+
+DEFAULT_CAMERA_URL_FILE = Path(__file__).resolve().parent / ".camera-ngrok-url"
+
+
+def normalize_stream_url(url: str) -> str:
+    """Accept either a base camera URL or the full MJPEG /stream URL."""
+    value = url.strip()
+    if not value:
+        raise ValueError("Camera stream URL is empty")
+
+    parsed = urlparse(value)
+    if parsed.scheme not in {"http", "https"}:
+        host = value.split("/", 1)[0].split(":", 1)[0]
+        scheme = "http" if host in {"localhost", "127.0.0.1"} or host.replace(".", "").isdigit() else "https"
+        value = f"{scheme}://{value}"
+
+    return value.rstrip("/") if value.rstrip("/").endswith("/stream") else value.rstrip("/") + "/stream"
+
+
+def read_url_file(path: Path) -> Optional[str]:
+    if not path.exists():
+        return None
+
+    for line in path.read_text(encoding="utf-8").splitlines():
+        value = line.strip()
+        if value and not value.startswith("#"):
+            return value
+    return None
 
 def get_local_ip():
     """Get local IP address"""
@@ -36,7 +67,25 @@ def main():
         "--esp32-url",
         type=str,
         default=None,
-        help="ESP32-CAM MJPEG stream URL (e.g., http://192.168.1.50:8081/stream)"
+        help="Camera MJPEG stream URL or ngrok base URL (e.g., https://xxxx.ngrok-free.app)"
+    )
+    parser.add_argument(
+        "--camera-url",
+        type=str,
+        default=None,
+        help="Alias for --esp32-url. Use this when the camera is a webcam/local camera bridge."
+    )
+    parser.add_argument(
+        "--esp32-url-file",
+        type=Path,
+        default=DEFAULT_CAMERA_URL_FILE,
+        help=f"File containing camera/ngrok URL (default: {DEFAULT_CAMERA_URL_FILE})"
+    )
+    parser.add_argument(
+        "--camera-url-file",
+        type=Path,
+        default=None,
+        help="Alias for --esp32-url-file"
     )
     parser.add_argument(
         "--port",
@@ -72,12 +121,24 @@ def main():
         print("   Run: pip install -r requirements_api.txt")
         sys.exit(1)
 
-    # Get ESP32-CAM URL
-    esp32_url = args.esp32_url
+    # Get camera stream URL. ESP32_* names are kept for compatibility.
+    url_file = args.camera_url_file or args.esp32_url_file
+    esp32_url = (
+        args.camera_url
+        or args.esp32_url
+        or os.getenv("CAMERA_STREAM_URL")
+        or os.getenv("CAMERA_NGROK_URL")
+        or os.getenv("ESP32_STREAM_URL")
+        or os.getenv("ESP32_NGROK_URL")
+    )
     if not esp32_url:
-        print("⚙️  ESP32-CAM Configuration")
-        print("   Enter your ESP32-CAM stream URL")
-        print("   Example: http://192.168.1.50:8081/stream")
+        esp32_url = read_url_file(url_file)
+
+    if not esp32_url:
+        print("⚙️  Camera Configuration")
+        print("   Enter your camera stream URL")
+        print("   Example local: http://192.168.1.50:8081/stream")
+        print("   Example ngrok: https://xxxx.ngrok-free.app")
         print("   Or press Enter to use default test URL")
         esp32_url = input("   URL: ").strip()
         if not esp32_url:
@@ -85,9 +146,15 @@ def main():
             esp32_url = f"http://192.168.1.50:8081/stream"
             print(f"   ℹ️  Using default: {esp32_url}")
 
+    try:
+        esp32_url = normalize_stream_url(esp32_url)
+    except ValueError as e:
+        print(f"   ❌ Invalid camera URL: {e}")
+        sys.exit(1)
+
     print(f"\n📡 Configuration:")
     print(f"   Server: http://0.0.0.0:{args.port}")
-    print(f"   ESP32-CAM Stream: {esp32_url}")
+    print(f"   Camera Stream: {esp32_url}")
     print(f"   Local IP: http://{get_local_ip()}:{args.port}")
     print()
 
@@ -119,7 +186,7 @@ def main():
         print(f"   Health: http://localhost:{args.port}/health")
         print(f"   Stats: http://localhost:{args.port}/api/stats")
         print(f"   Config: http://localhost:{args.port}/api/config")
-        print(f"\n📹 ESP32-CAM Stream:")
+        print(f"\n📹 Camera Stream:")
         print(f"   {esp32_url}")
         print(f"\n💡 Tips:")
         print(f"   - Open the web URL in your browser")

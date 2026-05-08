@@ -3,5 +3,9 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch/
+__pycache__/
+*.py[cod]
 *.log
 *.tmp
+.esp32-ngrok-url
+.auto-camera-ngrok.json
