@@ -130,14 +130,14 @@ class TestWifiConfigHelpers(unittest.TestCase):
                 "192.168.1.100",
                 vflip=True,
                 hmirror=False,
-                stream_timeout_ms=0,
+                stream_timeout_ms=300000,
                 enable_health_check=False,
             )
             text = path.read_text(encoding="utf-8")
 
         self.assertIn("#define DADN_CAMERA_VFLIP 1", text)
         self.assertIn("#define DADN_CAMERA_HMIRROR 0", text)
-        self.assertIn("#define DADN_STREAM_TIMEOUT_MS 0", text)
+        self.assertIn("#define DADN_STREAM_TIMEOUT_MS 300000", text)
 
 
 class TestHostHints(unittest.TestCase):

@@ -63,7 +63,7 @@ def main() -> int:
     parser.add_argument("--server-ip", default="192.168.1.100", help="DADN/API server IP used by ESP32 health checks")
     parser.add_argument("--vflip", action="store_true", help="Flip camera vertically")
     parser.add_argument("--hmirror", action="store_true", help="Mirror camera horizontally")
-    parser.add_argument("--stream-timeout-ms", type=int, default=0, help="Stop each MJPEG client after N ms. 0 means no timeout.")
+    parser.add_argument("--stream-timeout-ms", type=int, default=300000, help="Stop each MJPEG client after N ms. 0 means no timeout.")
     parser.add_argument("--enable-health-check", action="store_true", help="Ping DADN API server from ESP32 loop")
     parser.add_argument("--upload", action="store_true", help="Run PlatformIO upload after writing credentials")
     parser.add_argument("--upload-port", default=None, help="Upload serial port, e.g. COM13")

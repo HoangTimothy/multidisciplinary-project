@@ -61,7 +61,7 @@ static const int SERVER_PORT = 5000;
 #endif
 
 #ifndef DADN_STREAM_TIMEOUT_MS
-#define DADN_STREAM_TIMEOUT_MS 0
+#define DADN_STREAM_TIMEOUT_MS 300000
 #endif
 
 // Streaming + GPIO config
@@ -161,6 +161,7 @@ void initWiFi()
 void handleStream()
 {
   WiFiClient client = server.client();
+  client.setTimeout(1);
   String response = "HTTP/1.1 200 OK\r\n";
   response += "Content-Type: multipart/x-mixed-replace; boundary=frame\r\n";
   response += "Cache-Control: no-store, no-cache, must-revalidate, max-age=0\r\n";
@@ -168,9 +169,14 @@ void handleStream()
   response += "Access-Control-Allow-Origin: *\r\n";
   response += "X-Accel-Buffering: no\r\n";
   response += "Connection: close\r\n\r\n";
-  client.write((const uint8_t *)response.c_str(), response.length());
+  if (client.write((const uint8_t *)response.c_str(), response.length()) != response.length())
+  {
+    client.stop();
+    return;
+  }
 
   uint32_t streamDeadline = DADN_STREAM_TIMEOUT_MS > 0 ? millis() + DADN_STREAM_TIMEOUT_MS : 0;
+  Serial.println("[INFO] Stream client connected");
   while (client.connected())
   {
     if (DADN_STREAM_TIMEOUT_MS > 0 && millis() > streamDeadline)
@@ -189,15 +195,22 @@ void handleStream()
 
     frameCount++;
     String head = "--frame\r\nContent-Type: image/jpeg\r\nContent-Length: " + String(fb->len) + "\r\n\r\n";
-    client.write((const uint8_t *)head.c_str(), head.length());
-    client.write((const uint8_t *)fb->buf, fb->len);
-    client.write((const uint8_t *)"\r\n", 2);
+    bool write_ok = true;
+    write_ok = write_ok && client.write((const uint8_t *)head.c_str(), head.length()) == head.length();
+    write_ok = write_ok && client.write((const uint8_t *)fb->buf, fb->len) == fb->len;
+    write_ok = write_ok && client.write((const uint8_t *)"\r\n", 2) == 2;
     esp_camera_fb_return(fb);
+    if (!write_ok)
+    {
+      Serial.println("[WARN] Stream client write failed");
+      break;
+    }
 
     delay(60);
   }
 
   client.stop();
+  Serial.println("[INFO] Stream client disconnected");
 }
 
 void handleRoot()
@@ -206,7 +219,7 @@ void handleRoot()
   html += "<h2>ESP32-CAM Stream</h2>";
   html += "<p>IP: " + WiFi.localIP().toString() + "</p>";
   html += "<p>Frames: " + String(frameCount) + "</p>";
-  html += "<img src='/stream' style='max-width:95%;height:auto;'/>";
+  html += "<p><a href='/stream'>Open MJPEG stream</a></p>";
   html += "</body></html>";
   server.send(200, "text/html", html);
 }

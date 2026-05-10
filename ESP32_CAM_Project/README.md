@@ -112,8 +112,9 @@ web server can focus on serving `/` and `/stream`. Enable
 `DADN_ENABLE_SERVER_HEALTH_CHECK` in `include/wifi_credentials.h` only when a
 local API server is already reachable from the ESP32-CAM.
 
-MJPEG stream timeout is disabled by default (`DADN_STREAM_TIMEOUT_MS 0`), so the
-browser/ngrok stream stays open until the viewer disconnects.
+MJPEG stream timeout is long but finite by default (`DADN_STREAM_TIMEOUT_MS
+300000`) so stale browser/ngrok clients are released after five minutes. Set it
+to `0` only if clients disconnect cleanly in your network.
 
 ## Board
 - Board: `esp32cam` (AI Thinker ESP32-CAM)

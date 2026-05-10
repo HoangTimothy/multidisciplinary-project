@@ -17,5 +17,6 @@
 #define DADN_CAMERA_VFLIP 0
 #define DADN_CAMERA_HMIRROR 0
 
-// 0 keeps MJPEG streams open until the browser disconnects.
-#define DADN_STREAM_TIMEOUT_MS 0
+// Long enough for demos, finite so stale ngrok/browser clients are released.
+// Use 0 only if you are sure clients disconnect cleanly.
+#define DADN_STREAM_TIMEOUT_MS 300000
