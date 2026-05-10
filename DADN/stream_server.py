@@ -125,6 +125,7 @@ def capture_stream():
     frame_times = deque(maxlen=30)
 
     while True:
+        stream = None
         try:
             print(f"[INFO] Connecting to camera stream at {stream_url}")
             stream = urllib.request.urlopen(stream_url, timeout=INFERENCE_TIMEOUT)
@@ -188,6 +189,11 @@ def capture_stream():
             inference_stats["camera_connected"] = False
             print(f"[ERROR] Stream connection failed: {e}")
             print(f"[INFO] Retry after 2s. Check camera URL: {stream_url}")
+            try:
+                if stream is not None:
+                    stream.close()
+            except Exception:
+                pass
             time.sleep(2)
 
 
