@@ -133,6 +133,13 @@ specific adapter:
 python run_esp32_all.py --ngrok-token <YOUR_NGROK_TOKEN> --serial-port COM13
 ```
 
+The wrapper scans common ESP32-CAM stream ports automatically: `8081`, `80`,
+`81`, and `8080`. Override that list when needed:
+
+```bash
+python run_esp32_all.py --ngrok-token <YOUR_NGROK_TOKEN> --ports 80,8081
+```
+
 The auto launcher scans active local networks for an ESP32-CAM on port `8081`,
 starts/restarts ngrok, writes the public URL to `.esp32-ngrok-url`, and prints
 the Raspberry Pi command.

@@ -19,6 +19,7 @@ from typing import Optional
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 TOOLS_DIR = PROJECT_ROOT / ".tools"
 STREAM_PATH = "/stream"
+DEFAULT_PORTS = [8081, 80, 81, 8080]
 
 
 def ngrok_download_url() -> str:
@@ -79,13 +80,29 @@ def configure_ngrok(ngrok_path: Path, token: str | None) -> None:
         raise RuntimeError(f"ngrok authtoken setup failed\n{stdout}\n{stderr}")
 
 
-def parse_stream_url(text: str, port: int) -> Optional[str]:
+def parse_ports(value: str) -> list[int]:
+    ports: list[int] = []
+    for item in value.split(","):
+        item = item.strip()
+        if not item:
+            continue
+        port = int(item)
+        if port not in ports:
+            ports.append(port)
+    return ports
+
+
+def parse_stream_url(text: str) -> Optional[str]:
     match = re.search(r"https?://(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?/stream\b", text)
     if match:
         return match.group(0)
+    return None
+
+
+def parse_ip(text: str) -> Optional[str]:
     match = re.search(r"(?:Local IP|IP Address|IP)\s*:\s*((?:\d{1,3}\.){3}\d{1,3})", text, re.IGNORECASE)
     if match:
-        return f"http://{match.group(1)}:{port}{STREAM_PATH}"
+        return match.group(1)
     return None
 
 
@@ -97,6 +114,18 @@ def validate_stream_url(url: str, timeout: float) -> bool:
             return "multipart" in content_type or "image/jpeg" in content_type
     except Exception:
         return False
+
+
+def stream_urls_for_ip(ip: str, ports: list[int]) -> list[str]:
+    return [f"http://{ip}:{port}{STREAM_PATH}" if port != 80 else f"http://{ip}{STREAM_PATH}" for port in ports]
+
+
+def validate_first_stream_url(urls: list[str], timeout: float) -> Optional[str]:
+    for url in urls:
+        print(f"[INFO] Checking stream candidate: {url}")
+        if validate_stream_url(url, timeout):
+            return url
+    return None
 
 
 def serial_ports_from_pyserial() -> list[str]:
@@ -120,7 +149,7 @@ def serial_ports_from_pyserial() -> list[str]:
     return preferred + [item for item in fallback if item not in preferred]
 
 
-def read_serial_for_stream_url(port_name: str, baud: int, seconds: float, stream_port: int) -> Optional[str]:
+def read_serial_for_stream_url(port_name: str, baud: int, seconds: float, stream_ports: list[int], timeout: float) -> Optional[str]:
     try:
         import serial
     except Exception as exc:
@@ -148,9 +177,15 @@ def read_serial_for_stream_url(port_name: str, baud: int, seconds: float, stream
                 if line:
                     print(f"[SERIAL:{port_name}] {line}")
                     seen.append(line)
-                    stream_url = parse_stream_url("\n".join(seen[-30:]), stream_port)
+                    recent = "\n".join(seen[-30:])
+                    stream_url = parse_stream_url(recent)
                     if stream_url:
-                        return stream_url
+                        return stream_url if validate_stream_url(stream_url, timeout) else None
+                    ip = parse_ip(recent)
+                    if ip:
+                        stream_url = validate_first_stream_url(stream_urls_for_ip(ip, stream_ports), timeout)
+                        if stream_url:
+                            return stream_url
     except Exception as exc:
         print(f"[WARN] Could not read serial port {port_name}: {exc}")
     return None
@@ -162,13 +197,18 @@ def discover_stream_from_serial(args: argparse.Namespace) -> Optional[str]:
     if not ports:
         print("[WARN] No serial ports found for ESP32 fallback.")
         return None
+    stream_ports = parse_ports(args.ports)
     for port_name in ports:
-        stream_url = read_serial_for_stream_url(port_name, args.serial_baud, args.serial_timeout, args.port)
+        stream_url = read_serial_for_stream_url(
+            port_name,
+            args.serial_baud,
+            args.serial_timeout,
+            stream_ports,
+            args.timeout,
+        )
         if stream_url:
             print(f"[INFO] Serial fallback found ESP32 stream URL: {stream_url}")
-            if validate_stream_url(stream_url, args.timeout):
-                return stream_url
-            print(f"[WARN] Serial URL did not validate as MJPEG stream: {stream_url}")
+            return stream_url
     return None
 
 
@@ -193,7 +233,12 @@ def main() -> int:
     parser.add_argument("--install-ngrok", action="store_true", default=True)
     parser.add_argument("--watch", action="store_true", help="Keep watching ESP32 IP changes instead of one-shot")
     parser.add_argument("--subnet", action="append", default=[], help="Extra subnet to scan, e.g. 192.168.1.0/24")
-    parser.add_argument("--port", type=int, default=8081)
+    parser.add_argument("--port", type=int, default=None, help="Single port to scan. Overrides --ports.")
+    parser.add_argument(
+        "--ports",
+        default=",".join(str(item) for item in DEFAULT_PORTS),
+        help="Comma-separated ports to scan, default: 8081,80,81,8080",
+    )
     parser.add_argument("--timeout", type=float, default=0.35)
     parser.add_argument("--workers", type=int, default=64)
     parser.add_argument("--ngrok-url", default=None)
@@ -209,40 +254,44 @@ def main() -> int:
     env = dict(os.environ)
     env["PATH"] = str(ngrok_path.parent) + os.pathsep + env.get("PATH", "")
 
-    command = [
-        sys.executable,
-        str(Path(__file__).resolve().parent / "auto_camera_ngrok.py"),
-        "--port",
-        str(args.port),
-        "--timeout",
-        str(args.timeout),
-        "--workers",
-        str(args.workers),
-    ]
-    if not args.watch:
-        command.append("--once")
-    for subnet in args.subnet:
-        command.extend(["--subnet", subnet])
-    if args.ngrok_url:
-        command.extend(["--ngrok-url", args.ngrok_url])
+    scan_ports = [args.port] if args.port else parse_ports(args.ports)
+    result = None
+    for port in scan_ports:
+        command = [
+            sys.executable,
+            str(Path(__file__).resolve().parent / "auto_camera_ngrok.py"),
+            "--port",
+            str(port),
+            "--timeout",
+            str(args.timeout),
+            "--workers",
+            str(args.workers),
+        ]
+        if not args.watch:
+            command.append("--once")
+        for subnet in args.subnet:
+            command.extend(["--subnet", subnet])
+        if args.ngrok_url:
+            command.extend(["--ngrok-url", args.ngrok_url])
 
-    print("[INFO] Starting ESP32-CAM auto-detect + ngrok expose...")
-    result = subprocess.run(command, cwd=PROJECT_ROOT, env=env, text=True, capture_output=True)
-    if result.stdout:
-        print(result.stdout, end="")
-    if result.stderr:
-        print(result.stderr, end="", file=sys.stderr)
-    if result.returncode == 0:
-        return 0
+        print(f"[INFO] Starting ESP32-CAM auto-detect + ngrok expose on port {port}...")
+        result = subprocess.run(command, cwd=PROJECT_ROOT, env=env, text=True, capture_output=True)
+        if result.stdout:
+            print(result.stdout, end="")
+        if result.stderr:
+            print(result.stderr, end="", file=sys.stderr)
+        if result.returncode == 0:
+            return 0
+        print(f"[WARN] No ESP32-CAM found on port {port}.")
 
     if not args.serial_fallback:
-        return result.returncode
+        return result.returncode if result else 1
 
     print("[INFO] LAN scan failed; trying ESP32 Serial Monitor fallback...")
     stream_url = discover_stream_from_serial(args)
     if not stream_url:
         print("[ERROR] Could not discover ESP32 stream from LAN scan or serial fallback.")
-        return result.returncode
+        return result.returncode if result else 1
     return expose_known_stream_url(stream_url, env, args)
 
 
