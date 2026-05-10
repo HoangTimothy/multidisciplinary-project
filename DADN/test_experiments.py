@@ -50,7 +50,7 @@ def test_all_known_coco_labels_are_alert_candidates():
 def test_alert_priority_threshold_suppresses_weak_generic_alerts():
     engine = DecisionEngine(640, 480, alert_priority_threshold=ALERT_PRIORITY_THRESHOLD)
 
-    weak_alert = engine.choose_alert([DetectionItem("book", 0.4, 260, 260, 160, 180)])
+    weak_alert = engine.choose_alert([DetectionItem("book", 0.4, 20, 20, 80, 80)])
     strong_alert = engine.choose_alert([DetectionItem("book", 0.95, 180, 120, 300, 320)])
 
     assert weak_alert is None

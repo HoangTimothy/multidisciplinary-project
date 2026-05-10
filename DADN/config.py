@@ -28,7 +28,7 @@ LOWER_ZONE_MIN_Y = 0.40
 
 SPEAK_COOLDOWN_SECONDS = 3.0
 REPEAT_IF_RISK_UPGRADED_SECONDS = 1.0
-ALERT_PRIORITY_THRESHOLD = 0.45
+ALERT_PRIORITY_THRESHOLD = 0.35
 
 VI_LABELS = {
     "person": "người",
@@ -116,7 +116,7 @@ VI_LABELS = {
 # The detector is COCO-style, so keep all known COCO labels eligible for alert
 # scoring. Mobility-relevant objects get higher weights; everything else needs
 # stronger confidence/nearer geometry to pass ALERT_PRIORITY_THRESHOLD.
-DEFAULT_CLASS_WEIGHT = 0.35
+DEFAULT_CLASS_WEIGHT = 0.55
 MOBILITY_CLASS_WEIGHTS = {
     "person": 1.00,
     "bicycle": 0.90,

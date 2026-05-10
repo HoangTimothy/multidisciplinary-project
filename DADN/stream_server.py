@@ -250,6 +250,8 @@ def inference_worker():
                     "timestamp": time.time(),
                 }
                 print(f"[ALERT] {alert.label_vi} ({alert.distance_level})")
+            else:
+                inference_stats["last_alert"] = None
 
             last_detection_result = (frame_bgr, alert, detections)
 
