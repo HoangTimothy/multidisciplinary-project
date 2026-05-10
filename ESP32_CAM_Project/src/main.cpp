@@ -48,6 +48,10 @@ static const char *SERVER_IP = "192.168.1.100";
 #endif
 static const int SERVER_PORT = 5000;
 
+#ifndef DADN_ENABLE_SERVER_HEALTH_CHECK
+#define DADN_ENABLE_SERVER_HEALTH_CHECK 0
+#endif
+
 // Streaming + GPIO config
 #define STREAM_PORT 8081
 #define STATUS_LED 33
@@ -240,18 +244,22 @@ void setup()
   server.begin();
 
   Serial.printf("[INFO] Stream URL: http://%s:%d/stream\n", WiFi.localIP().toString().c_str(), STREAM_PORT);
+#if DADN_ENABLE_SERVER_HEALTH_CHECK
   checkServerHealth();
+#endif
 }
 
 void loop()
 {
   server.handleClient();
 
+#if DADN_ENABLE_SERVER_HEALTH_CHECK
   if (millis() - lastServerSendTime > SEND_TO_SERVER_INTERVAL_MS)
   {
     lastServerSendTime = millis();
     checkServerHealth();
   }
+#endif
 
   delay(5);
 }

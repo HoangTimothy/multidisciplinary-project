@@ -8,3 +8,7 @@
 }
 
 #define DADN_SERVER_IP "192.168.1.100"
+
+// Keep disabled for camera-stream-only demos. Enable only when a local DADN API
+// server is running and reachable from the ESP32-CAM.
+#define DADN_ENABLE_SERVER_HEALTH_CHECK 0

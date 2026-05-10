@@ -143,9 +143,13 @@ def validate_esp32_root(url: str, timeout: float) -> bool:
     try:
         request = urllib.request.Request(base_url + "/", headers={"User-Agent": "dadn-esp32-one-run"})
         with urllib.request.urlopen(request, timeout=timeout) as response:
+            if response.status >= 400:
+                return False
             content_type = response.headers.get("content-type", "").lower()
-            body = response.read(512).decode("utf-8", errors="ignore")
-            return response.status < 400 and ("text/html" in content_type or "ESP32-CAM" in body or STREAM_PATH in body)
+            if "text/html" in content_type:
+                return True
+            body = response.read(128).decode("utf-8", errors="ignore")
+            return "ESP32-CAM" in body or STREAM_PATH in body
     except Exception:
         return False
 
@@ -153,8 +157,8 @@ def validate_esp32_root(url: str, timeout: float) -> bool:
 def validate_esp32_stream_candidate(url: str, timeout: float) -> bool:
     # Prefer the root page. Opening /stream as a probe can tie up the ESP32
     # single-threaded WebServer until its stream timeout expires.
-    root_timeout = max(timeout, 2.0)
-    return validate_esp32_root(url, root_timeout) or validate_stream_url(url, root_timeout)
+    root_timeout = max(timeout, 1.0)
+    return validate_esp32_root(url, root_timeout)
 
 
 def normalize_stream_url(value: str) -> str:
@@ -175,6 +179,26 @@ def validate_first_stream_url(urls: list[str], timeout: float) -> Optional[str]:
         print(f"[INFO] Checking stream candidate: {url}")
         if validate_esp32_stream_candidate(url, timeout):
             return url
+    return None
+
+
+def wait_for_stream_url(url: str, timeout: float, ready_timeout: float) -> Optional[str]:
+    deadline = time.time() + ready_timeout
+    while time.time() < deadline:
+        print(f"[INFO] Checking stream candidate: {url}")
+        if validate_esp32_stream_candidate(url, timeout):
+            return url
+        time.sleep(0.75)
+    return None
+
+
+def wait_for_first_stream_url(urls: list[str], timeout: float, ready_timeout: float) -> Optional[str]:
+    deadline = time.time() + ready_timeout
+    while time.time() < deadline:
+        stream_url = validate_first_stream_url(urls, timeout)
+        if stream_url:
+            return stream_url
+        time.sleep(0.75)
     return None
 
 
@@ -267,7 +291,14 @@ def print_wifi_failure_help(lines: list[str]) -> None:
     print("[ERROR] Until Serial prints a real Local IP, LAN scan and ngrok cannot expose the stream.")
 
 
-def read_serial_for_stream_url(port_name: str, baud: int, seconds: float, stream_ports: list[int], timeout: float) -> Optional[str]:
+def read_serial_for_stream_url(
+    port_name: str,
+    baud: int,
+    seconds: float,
+    stream_ports: list[int],
+    timeout: float,
+    stream_ready_timeout: float,
+) -> Optional[str]:
     try:
         import serial
     except Exception as exc:
@@ -278,6 +309,7 @@ def read_serial_for_stream_url(port_name: str, baud: int, seconds: float, stream
     print(f"[INFO] Reading ESP32 serial log from {port_name} at {baud} baud...")
     deadline = time.time() + seconds
     seen: list[str] = []
+    last_ip: Optional[str] = None
     try:
         with serial.Serial(port_name, baudrate=baud, timeout=0.5) as ser:
             # Keep auto-reset lines inactive while reading. Some USB-UART adapters
@@ -296,17 +328,24 @@ def read_serial_for_stream_url(port_name: str, baud: int, seconds: float, stream
                 if line:
                     print(f"[SERIAL:{port_name}] {line}")
                     seen.append(line)
-                    recent = "\n".join(seen[-30:])
-                    stream_url = parse_stream_url(recent)
+                    stream_url = parse_stream_url(line)
                     if stream_url:
-                        if validate_esp32_stream_candidate(stream_url, timeout):
+                        found_url = wait_for_stream_url(stream_url, timeout, stream_ready_timeout)
+                        if found_url:
                             return stream_url
                         print(f"[WARN] Serial printed a stream URL, but it is not reachable yet: {stream_url}")
-                    ip = parse_ip(recent)
+                    ip = parse_ip(line)
                     if ip:
-                        stream_url = validate_first_stream_url(stream_urls_for_ip(ip, stream_ports), timeout)
-                        if stream_url:
-                            return stream_url
+                        last_ip = ip
+                        print(f"[INFO] Serial found ESP32 IP: {ip}; waiting for Stream URL before validating.")
+            if last_ip:
+                stream_url = wait_for_first_stream_url(
+                    stream_urls_for_ip(last_ip, stream_ports),
+                    timeout,
+                    stream_ready_timeout,
+                )
+                if stream_url:
+                    return stream_url
             if saw_download_mode(seen) and not saw_firmware_ready(seen):
                 print_download_mode_help(port_name)
             elif saw_wifi_failure(seen):
@@ -330,6 +369,7 @@ def discover_stream_from_serial(args: argparse.Namespace) -> Optional[str]:
             args.serial_timeout,
             stream_ports,
             args.timeout,
+            args.stream_ready_timeout,
         )
         if stream_url:
             print(f"[INFO] Serial fallback found ESP32 stream URL: {stream_url}")
@@ -380,6 +420,7 @@ def main() -> int:
     parser.add_argument("--serial-port", default=None, help="Explicit ESP32 serial port, e.g. COM13 or /dev/ttyUSB0")
     parser.add_argument("--serial-baud", type=int, default=115200)
     parser.add_argument("--serial-timeout", type=float, default=18.0)
+    parser.add_argument("--stream-ready-timeout", type=float, default=20.0)
     parser.add_argument(
         "--serial-first",
         action="store_true",

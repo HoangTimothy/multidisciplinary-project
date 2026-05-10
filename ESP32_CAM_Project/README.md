@@ -100,6 +100,11 @@ http://0.0.0.0:8081/stream`, the camera firmware is running but the ESP32-CAM is
 not on WiFi yet. Re-run `configure_esp32_wifi.py` with a 2.4 GHz SSID/password,
 upload again, then check Serial Monitor for a real local IP.
 
+The firmware keeps DADN API health checks disabled by default so the ESP32-CAM
+web server can focus on serving `/` and `/stream`. Enable
+`DADN_ENABLE_SERVER_HEALTH_CHECK` in `include/wifi_credentials.h` only when a
+local API server is already reachable from the ESP32-CAM.
+
 ## Board
 - Board: `esp32cam` (AI Thinker ESP32-CAM)
 - Framework: Arduino
