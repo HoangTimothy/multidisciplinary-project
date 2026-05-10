@@ -128,7 +128,14 @@ def capture_stream():
         stream = None
         try:
             print(f"[INFO] Connecting to camera stream at {stream_url}")
-            stream = urllib.request.urlopen(stream_url, timeout=INFERENCE_TIMEOUT)
+            request = urllib.request.Request(
+                stream_url,
+                headers={
+                    "User-Agent": "dadn-stream-server",
+                    "ngrok-skip-browser-warning": "true",
+                },
+            )
+            stream = urllib.request.urlopen(request, timeout=INFERENCE_TIMEOUT)
             inference_stats["camera_connected"] = True
             buffer = b""
 
