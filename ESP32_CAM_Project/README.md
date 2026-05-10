@@ -9,12 +9,26 @@ PlatformIO firmware project for AI Thinker ESP32-CAM.
 - ngrok helper for sending the ESP32-CAM stream to remote DADN inference
 
 ## Configuration
-Edit WiFi and server IP placeholders in:
-- `src/main.cpp`
+Create a local credentials file. It is ignored by Git so the WiFi password is
+not committed:
+
+```bash
+python configure_esp32_wifi.py --ssid "YOUR_2G_WIFI" --password "YOUR_WIFI_PASSWORD"
+```
+
+On Windows with the current CH340 adapter:
+
+```powershell
+D:\DADN\venv\Scripts\python.exe configure_esp32_wifi.py --ssid "YOUR_2G_WIFI" --password "YOUR_WIFI_PASSWORD" --upload --upload-port COM13
+```
+
+This writes `include/wifi_credentials.h`, then optionally uploads the firmware.
+You can also copy `include/wifi_credentials.example.h` manually.
 
 ```cpp
-{"YOUR_WIFI_SSID", "YOUR_WIFI_PASSWORD"}
-static const char* SERVER_IP = "192.168.1.100";
+#define DADN_WIFI_CANDIDATES { \
+  {"YOUR_WIFI_SSID", "YOUR_WIFI_PASSWORD"} \
+}
 ```
 
 ## Build and Upload (PlatformIO)
@@ -69,17 +83,22 @@ Read Serial Monitor manually from PowerShell if needed:
 ```powershell
 $p = New-Object System.IO.Ports.SerialPort "COM13",115200,"None",8,"One"
 $p.ReadTimeout = 1000
+$p.DtrEnable = $false
+$p.RtsEnable = $false
 $p.Open()
 while ($true) { try { $p.ReadLine() } catch {} }
 ```
 
-To reset the ESP32-CAM and catch the boot log, pulse RTS before reading:
+If Serial Monitor prints `DOWNLOAD_BOOT` and `waiting for download`, the board
+is in flash/download mode instead of running the camera firmware. Release the
+BOOT/FLASH button, disconnect GPIO0 from GND, then press RESET or power-cycle
+the board. A healthy boot prints `ESP32-CAM PlatformIO Stream` and `Stream URL:
+http://<ip>:8081/stream`.
 
-```powershell
-$p.RtsEnable = $true
-Start-Sleep -Milliseconds 150
-$p.RtsEnable = $false
-```
+If Serial Monitor prints `WiFi connection failed` and `Stream URL:
+http://0.0.0.0:8081/stream`, the camera firmware is running but the ESP32-CAM is
+not on WiFi yet. Re-run `configure_esp32_wifi.py` with a 2.4 GHz SSID/password,
+upload again, then check Serial Monitor for a real local IP.
 
 ## Board
 - Board: `esp32cam` (AI Thinker ESP32-CAM)
@@ -124,6 +143,16 @@ public `/stream` URL:
 NGROK_AUTHTOKEN=<YOUR_NGROK_TOKEN> python run_esp32_all.py
 ```
 
+In PowerShell, set the environment variable with PowerShell syntax, or pass the
+token as an argument:
+
+```powershell
+$env:NGROK_AUTHTOKEN = "<YOUR_NGROK_TOKEN>"
+python run_esp32_all.py
+
+python run_esp32_all.py --ngrok-token "<YOUR_NGROK_TOKEN>"
+```
+
 If LAN scan cannot find the ESP32-CAM, the wrapper automatically falls back to
 reading the ESP32 Serial Monitor, parses `Stream URL:
 http://<ip>:8081/stream`, validates the stream, and exposes that URL. To force a
@@ -138,6 +167,13 @@ The wrapper scans common ESP32-CAM stream ports automatically: `8081`, `80`,
 
 ```bash
 python run_esp32_all.py --ngrok-token <YOUR_NGROK_TOKEN> --ports 80,8081
+```
+
+If you already know the ESP32-CAM IP or local stream URL, skip subnet scanning:
+
+```bash
+python run_esp32_all.py --ngrok-token <YOUR_NGROK_TOKEN> --esp32-ip 192.168.1.50
+python run_esp32_all.py --ngrok-token <YOUR_NGROK_TOKEN> --esp32-url http://192.168.1.50:8081/stream
 ```
 
 The auto launcher scans active local networks for an ESP32-CAM on port `8081`,

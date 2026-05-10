@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import os
 import platform
 import re
@@ -20,6 +21,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 TOOLS_DIR = PROJECT_ROOT / ".tools"
 STREAM_PATH = "/stream"
 DEFAULT_PORTS = [8081, 80, 81, 8080]
+DOWNLOAD_MODE_MARKERS = ("DOWNLOAD_BOOT", "waiting for download")
+FIRMWARE_READY_MARKERS = ("ESP32-CAM PlatformIO Stream", "Stream URL:", "Local IP:")
+WIFI_FAILURE_MARKERS = ("WiFi connection failed", "Stream URL: http://0.0.0.0")
 
 
 def ngrok_download_url() -> str:
@@ -95,15 +99,26 @@ def parse_ports(value: str) -> list[int]:
 def parse_stream_url(text: str) -> Optional[str]:
     match = re.search(r"https?://(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?/stream\b", text)
     if match:
-        return match.group(0)
+        url = match.group(0)
+        host_match = re.search(r"https?://((?:\d{1,3}\.){3}\d{1,3})", url)
+        if host_match and is_usable_camera_ip(host_match.group(1)):
+            return url
     return None
 
 
 def parse_ip(text: str) -> Optional[str]:
     match = re.search(r"(?:Local IP|IP Address|IP)\s*:\s*((?:\d{1,3}\.){3}\d{1,3})", text, re.IGNORECASE)
-    if match:
+    if match and is_usable_camera_ip(match.group(1)):
         return match.group(1)
     return None
+
+
+def is_usable_camera_ip(value: str) -> bool:
+    try:
+        ip = ipaddress.IPv4Address(value)
+    except ValueError:
+        return False
+    return not (ip.is_unspecified or ip.is_loopback or ip.is_multicast or ip.is_reserved)
 
 
 def validate_stream_url(url: str, timeout: float) -> bool:
@@ -114,6 +129,15 @@ def validate_stream_url(url: str, timeout: float) -> bool:
             return "multipart" in content_type or "image/jpeg" in content_type
     except Exception:
         return False
+
+
+def normalize_stream_url(value: str) -> str:
+    url = value.strip().rstrip("/")
+    if not url:
+        raise ValueError("ESP32 URL is empty")
+    if not url.startswith(("http://", "https://")):
+        url = "http://" + url
+    return url if url.endswith(STREAM_PATH) else url + STREAM_PATH
 
 
 def stream_urls_for_ip(ip: str, ports: list[int]) -> list[str]:
@@ -149,6 +173,74 @@ def serial_ports_from_pyserial() -> list[str]:
     return preferred + [item for item in fallback if item not in preferred]
 
 
+def saw_download_mode(lines: list[str]) -> bool:
+    text = "\n".join(lines)
+    return any(marker in text for marker in DOWNLOAD_MODE_MARKERS)
+
+
+def saw_firmware_ready(lines: list[str]) -> bool:
+    text = "\n".join(lines)
+    return any(marker in text for marker in FIRMWARE_READY_MARKERS)
+
+
+def saw_wifi_failure(lines: list[str]) -> bool:
+    text = "\n".join(lines)
+    return any(marker in text for marker in WIFI_FAILURE_MARKERS)
+
+
+def connecting_ssids(lines: list[str]) -> list[str]:
+    ssids: list[str] = []
+    for line in lines:
+        match = re.search(r"Connecting WiFi:\s*(.+)$", line)
+        if match:
+            ssid = match.group(1).strip()
+            if ssid and ssid not in ssids:
+                ssids.append(ssid)
+    return ssids
+
+
+def current_windows_wifi_ssid() -> Optional[str]:
+    if not shutil.which("cmd.exe"):
+        return None
+    try:
+        result = subprocess.run(
+            ["cmd.exe", "/c", "netsh", "wlan", "show", "interfaces"],
+            text=True,
+            capture_output=True,
+            timeout=4,
+            check=False,
+        )
+    except Exception:
+        return None
+    for line in result.stdout.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("SSID") and "BSSID" not in stripped:
+            _, _, value = stripped.partition(":")
+            ssid = value.strip()
+            return ssid or None
+    return None
+
+
+def print_download_mode_help(port_name: str) -> None:
+    print(f"[ERROR] {port_name} is in ESP32 download/flash mode, not running the camera firmware.")
+    print("[ERROR] Fix on hardware, then rerun this command:")
+    print("        1. Disconnect GPIO0 from GND / release BOOT or FLASH button.")
+    print("        2. Press RESET, or unplug and plug the ESP32-CAM USB power again.")
+    print("        3. Serial should print 'ESP32-CAM PlatformIO Stream' and 'Stream URL: http://<ip>:8081/stream'.")
+
+
+def print_wifi_failure_help(lines: list[str]) -> None:
+    ssids = connecting_ssids(lines)
+    if ssids:
+        print(f"[ERROR] ESP32 firmware tried WiFi SSID(s): {', '.join(ssids)}")
+    current_ssid = current_windows_wifi_ssid()
+    if current_ssid:
+        print(f"[INFO] This Windows laptop is currently connected to WiFi SSID: {current_ssid}")
+    print("[ERROR] ESP32-CAM booted and camera initialized, but WiFi did not connect.")
+    print("[ERROR] Reflash/configure ESP32-CAM with a 2.4 GHz WiFi SSID/password reachable by this laptop.")
+    print("[ERROR] Until Serial prints a real Local IP, LAN scan and ngrok cannot expose the stream.")
+
+
 def read_serial_for_stream_url(port_name: str, baud: int, seconds: float, stream_ports: list[int], timeout: float) -> Optional[str]:
     try:
         import serial
@@ -162,11 +254,12 @@ def read_serial_for_stream_url(port_name: str, baud: int, seconds: float, stream
     seen: list[str] = []
     try:
         with serial.Serial(port_name, baudrate=baud, timeout=0.5) as ser:
-            # Pulse RTS to reset many ESP32-CAM USB-UART adapters and catch boot logs.
+            # Keep auto-reset lines inactive while reading. Some USB-UART adapters
+            # wire DTR/RTS to GPIO0/EN; asserting them can hold ESP32 in bootloader.
             try:
-                ser.rts = True
-                time.sleep(0.15)
+                ser.dtr = False
                 ser.rts = False
+                time.sleep(0.3)
             except Exception:
                 pass
             while time.time() < deadline:
@@ -180,12 +273,18 @@ def read_serial_for_stream_url(port_name: str, baud: int, seconds: float, stream
                     recent = "\n".join(seen[-30:])
                     stream_url = parse_stream_url(recent)
                     if stream_url:
-                        return stream_url if validate_stream_url(stream_url, timeout) else None
+                        if validate_stream_url(stream_url, timeout):
+                            return stream_url
+                        print(f"[WARN] Serial printed a stream URL, but it is not reachable yet: {stream_url}")
                     ip = parse_ip(recent)
                     if ip:
                         stream_url = validate_first_stream_url(stream_urls_for_ip(ip, stream_ports), timeout)
                         if stream_url:
                             return stream_url
+            if saw_download_mode(seen) and not saw_firmware_ready(seen):
+                print_download_mode_help(port_name)
+            elif saw_wifi_failure(seen):
+                print_wifi_failure_help(seen)
     except Exception as exc:
         print(f"[WARN] Could not read serial port {port_name}: {exc}")
     return None
@@ -232,6 +331,8 @@ def main() -> int:
     parser.add_argument("--ngrok-token", default=os.getenv("NGROK_AUTHTOKEN"))
     parser.add_argument("--install-ngrok", action="store_true", default=True)
     parser.add_argument("--watch", action="store_true", help="Keep watching ESP32 IP changes instead of one-shot")
+    parser.add_argument("--esp32-ip", default=None, help="Known ESP32-CAM LAN IP. Tries --ports and skips subnet scan.")
+    parser.add_argument("--esp32-url", default=None, help="Known ESP32-CAM local base/stream URL. Skips subnet scan.")
     parser.add_argument("--subnet", action="append", default=[], help="Extra subnet to scan, e.g. 192.168.1.0/24")
     parser.add_argument("--port", type=int, default=None, help="Single port to scan. Overrides --ports.")
     parser.add_argument(
@@ -255,6 +356,23 @@ def main() -> int:
     env["PATH"] = str(ngrok_path.parent) + os.pathsep + env.get("PATH", "")
 
     scan_ports = [args.port] if args.port else parse_ports(args.ports)
+
+    if args.esp32_url:
+        stream_url = normalize_stream_url(args.esp32_url)
+        print(f"[INFO] Checking known ESP32 stream URL: {stream_url}")
+        if not validate_stream_url(stream_url, args.timeout):
+            print("[ERROR] Known ESP32 URL did not respond as an MJPEG/JPEG stream.")
+            return 1
+        return expose_known_stream_url(stream_url, env, args)
+
+    if args.esp32_ip:
+        print(f"[INFO] Checking known ESP32 IP across ports: {args.esp32_ip}")
+        stream_url = validate_first_stream_url(stream_urls_for_ip(args.esp32_ip, scan_ports), args.timeout)
+        if not stream_url:
+            print(f"[ERROR] No ESP32-CAM stream found at {args.esp32_ip} on ports: {', '.join(map(str, scan_ports))}")
+            return 1
+        return expose_known_stream_url(stream_url, env, args)
+
     result = None
     for port in scan_ports:
         command = [

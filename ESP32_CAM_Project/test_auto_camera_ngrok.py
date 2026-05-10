@@ -6,12 +6,16 @@ from unittest import mock
 #   python -m unittest ESP32_CAM_Project.test_auto_camera_ngrok
 try:
     from ESP32_CAM_Project import auto_camera_ngrok as acn
+    from ESP32_CAM_Project import configure_esp32_wifi as wifi_config
+    from ESP32_CAM_Project import run_esp32_all as one_run
 except ImportError:
     import sys
     from pathlib import Path
 
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import auto_camera_ngrok as acn
+    import configure_esp32_wifi as wifi_config
+    import run_esp32_all as one_run
 
 
 class TestUrlNormalization(unittest.TestCase):
@@ -72,6 +76,40 @@ class TestUrlFileFormat(unittest.TestCase):
         # Smoke-check the spec requirement: what we write must end with /stream.
         stream_url = acn.public_stream_url("https://example.ngrok-free.app")
         self.assertTrue(stream_url.endswith("/stream"))
+
+
+class TestOneRunHelpers(unittest.TestCase):
+    def test_normalize_stream_url_accepts_base_url(self):
+        self.assertEqual(
+            one_run.normalize_stream_url("192.168.1.50:8081"),
+            "http://192.168.1.50:8081/stream",
+        )
+
+    def test_normalize_stream_url_is_idempotent(self):
+        self.assertEqual(
+            one_run.normalize_stream_url("http://192.168.1.50:8081/stream"),
+            "http://192.168.1.50:8081/stream",
+        )
+
+    def test_download_boot_detection(self):
+        lines = ["rst:0x1 (POWERON_RESET),boot:0x3 (DOWNLOAD_BOOT(UART0/UART1/SDIO_REI_REO_V2))", "waiting for download"]
+        self.assertTrue(one_run.saw_download_mode(lines))
+        self.assertFalse(one_run.saw_firmware_ready(lines))
+
+    def test_ignores_unspecified_ip_from_failed_wifi(self):
+        text = "[INFO] Stream URL: http://0.0.0.0:8081/stream"
+        self.assertIsNone(one_run.parse_stream_url(text))
+        self.assertIsNone(one_run.parse_ip("[SUCCESS] Local IP: 0.0.0.0"))
+
+    def test_wifi_failure_detection_extracts_ssid(self):
+        lines = ["[INFO] Connecting WiFi: HCMUT-MEETING", "[ERROR] WiFi connection failed for all configured candidates"]
+        self.assertTrue(one_run.saw_wifi_failure(lines))
+        self.assertEqual(one_run.connecting_ssids(lines), ["HCMUT-MEETING"])
+
+
+class TestWifiConfigHelpers(unittest.TestCase):
+    def test_c_string_escapes_quotes_and_backslashes(self):
+        self.assertEqual(wifi_config.c_string('A"B\\C'), '"A\\"B\\\\C"')
 
 
 class TestHostHints(unittest.TestCase):

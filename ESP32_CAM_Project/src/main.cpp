@@ -3,6 +3,10 @@
 #include <WiFi.h>
 #include <WebServer.h>
 
+#if __has_include("wifi_credentials.h")
+#include "wifi_credentials.h"
+#endif
+
 // AI Thinker ESP32-CAM pin map
 #define PWDN_GPIO_NUM 32
 #define RESET_GPIO_NUM -1
@@ -29,11 +33,19 @@ struct WifiCandidate
   const char *password;
 };
 
+#ifdef DADN_WIFI_CANDIDATES
+static const WifiCandidate WIFI_CANDIDATES[] = DADN_WIFI_CANDIDATES;
+#else
 static const WifiCandidate WIFI_CANDIDATES[] = {
     {"YOUR_WIFI_SSID", "YOUR_WIFI_PASSWORD"},
 };
+#endif
 
+#ifdef DADN_SERVER_IP
+static const char *SERVER_IP = DADN_SERVER_IP;
+#else
 static const char *SERVER_IP = "192.168.1.100";
+#endif
 static const int SERVER_PORT = 5000;
 
 // Streaming + GPIO config
