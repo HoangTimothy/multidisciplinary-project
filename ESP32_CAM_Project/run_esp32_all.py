@@ -14,6 +14,7 @@ import tempfile
 import time
 import urllib.request
 from pathlib import Path
+from urllib.parse import urlparse, urlunparse
 from typing import Optional
 
 
@@ -131,6 +132,31 @@ def validate_stream_url(url: str, timeout: float) -> bool:
         return False
 
 
+def stream_base_url(url: str) -> str:
+    normalized = normalize_stream_url(url)
+    parsed = urlparse(normalized)
+    return urlunparse((parsed.scheme, parsed.netloc, "", "", "", "")).rstrip("/")
+
+
+def validate_esp32_root(url: str, timeout: float) -> bool:
+    base_url = stream_base_url(url)
+    try:
+        request = urllib.request.Request(base_url + "/", headers={"User-Agent": "dadn-esp32-one-run"})
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            content_type = response.headers.get("content-type", "").lower()
+            body = response.read(512).decode("utf-8", errors="ignore")
+            return response.status < 400 and ("text/html" in content_type or "ESP32-CAM" in body or STREAM_PATH in body)
+    except Exception:
+        return False
+
+
+def validate_esp32_stream_candidate(url: str, timeout: float) -> bool:
+    # Prefer the root page. Opening /stream as a probe can tie up the ESP32
+    # single-threaded WebServer until its stream timeout expires.
+    root_timeout = max(timeout, 2.0)
+    return validate_esp32_root(url, root_timeout) or validate_stream_url(url, root_timeout)
+
+
 def normalize_stream_url(value: str) -> str:
     url = value.strip().rstrip("/")
     if not url:
@@ -147,7 +173,7 @@ def stream_urls_for_ip(ip: str, ports: list[int]) -> list[str]:
 def validate_first_stream_url(urls: list[str], timeout: float) -> Optional[str]:
     for url in urls:
         print(f"[INFO] Checking stream candidate: {url}")
-        if validate_stream_url(url, timeout):
+        if validate_esp32_stream_candidate(url, timeout):
             return url
     return None
 
@@ -273,7 +299,7 @@ def read_serial_for_stream_url(port_name: str, baud: int, seconds: float, stream
                     recent = "\n".join(seen[-30:])
                     stream_url = parse_stream_url(recent)
                     if stream_url:
-                        if validate_stream_url(stream_url, timeout):
+                        if validate_esp32_stream_candidate(stream_url, timeout):
                             return stream_url
                         print(f"[WARN] Serial printed a stream URL, but it is not reachable yet: {stream_url}")
                     ip = parse_ip(recent)
@@ -309,6 +335,13 @@ def discover_stream_from_serial(args: argparse.Namespace) -> Optional[str]:
             print(f"[INFO] Serial fallback found ESP32 stream URL: {stream_url}")
             return stream_url
     return None
+
+
+def discover_stream_from_serial_if_enabled(args: argparse.Namespace) -> Optional[str]:
+    if not args.serial_fallback:
+        return None
+    print("[INFO] Trying ESP32 Serial Monitor discovery...")
+    return discover_stream_from_serial(args)
 
 
 def expose_known_stream_url(stream_url: str, env: dict[str, str], args: argparse.Namespace) -> int:
@@ -347,6 +380,12 @@ def main() -> int:
     parser.add_argument("--serial-port", default=None, help="Explicit ESP32 serial port, e.g. COM13 or /dev/ttyUSB0")
     parser.add_argument("--serial-baud", type=int, default=115200)
     parser.add_argument("--serial-timeout", type=float, default=18.0)
+    parser.add_argument(
+        "--serial-first",
+        action="store_true",
+        default=False,
+        help="Read Serial Monitor before subnet scanning. Defaults on when --serial-port is provided.",
+    )
     args = parser.parse_args()
 
     ngrok_path = ensure_ngrok(args.install_ngrok)
@@ -360,7 +399,7 @@ def main() -> int:
     if args.esp32_url:
         stream_url = normalize_stream_url(args.esp32_url)
         print(f"[INFO] Checking known ESP32 stream URL: {stream_url}")
-        if not validate_stream_url(stream_url, args.timeout):
+        if not validate_esp32_stream_candidate(stream_url, args.timeout):
             print("[ERROR] Known ESP32 URL did not respond as an MJPEG/JPEG stream.")
             return 1
         return expose_known_stream_url(stream_url, env, args)
@@ -372,6 +411,12 @@ def main() -> int:
             print(f"[ERROR] No ESP32-CAM stream found at {args.esp32_ip} on ports: {', '.join(map(str, scan_ports))}")
             return 1
         return expose_known_stream_url(stream_url, env, args)
+
+    if args.serial_first or args.serial_port:
+        stream_url = discover_stream_from_serial_if_enabled(args)
+        if stream_url:
+            return expose_known_stream_url(stream_url, env, args)
+        print("[WARN] Serial discovery did not return a reachable stream; falling back to LAN scan.")
 
     result = None
     for port in scan_ports:
@@ -402,11 +447,11 @@ def main() -> int:
             return 0
         print(f"[WARN] No ESP32-CAM found on port {port}.")
 
-    if not args.serial_fallback:
+    if not args.serial_fallback or args.serial_first or args.serial_port:
         return result.returncode if result else 1
 
     print("[INFO] LAN scan failed; trying ESP32 Serial Monitor fallback...")
-    stream_url = discover_stream_from_serial(args)
+    stream_url = discover_stream_from_serial_if_enabled(args)
     if not stream_url:
         print("[ERROR] Could not discover ESP32 stream from LAN scan or serial fallback.")
         return result.returncode if result else 1

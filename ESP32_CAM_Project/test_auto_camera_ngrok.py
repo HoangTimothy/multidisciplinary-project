@@ -91,6 +91,12 @@ class TestOneRunHelpers(unittest.TestCase):
             "http://192.168.1.50:8081/stream",
         )
 
+    def test_stream_base_url_strips_path(self):
+        self.assertEqual(
+            one_run.stream_base_url("http://192.168.1.50:8081/stream"),
+            "http://192.168.1.50:8081",
+        )
+
     def test_download_boot_detection(self):
         lines = ["rst:0x1 (POWERON_RESET),boot:0x3 (DOWNLOAD_BOOT(UART0/UART1/SDIO_REI_REO_V2))", "waiting for download"]
         self.assertTrue(one_run.saw_download_mode(lines))
