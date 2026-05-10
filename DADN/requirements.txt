@@ -7,3 +7,4 @@ pyttsx3>=2.90
 Pillow>=10.0.1
 waitress>=2.1.2
 gTTS>=2.5.1
+pyserial>=3.5

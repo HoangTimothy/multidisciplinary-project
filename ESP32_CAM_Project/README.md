@@ -124,6 +124,15 @@ public `/stream` URL:
 NGROK_AUTHTOKEN=<YOUR_NGROK_TOKEN> python run_esp32_all.py
 ```
 
+If LAN scan cannot find the ESP32-CAM, the wrapper automatically falls back to
+reading the ESP32 Serial Monitor, parses `Stream URL:
+http://<ip>:8081/stream`, validates the stream, and exposes that URL. To force a
+specific adapter:
+
+```bash
+python run_esp32_all.py --ngrok-token <YOUR_NGROK_TOKEN> --serial-port COM13
+```
+
 The auto launcher scans active local networks for an ESP32-CAM on port `8081`,
 starts/restarts ngrok, writes the public URL to `.esp32-ngrok-url`, and prints
 the Raspberry Pi command.
