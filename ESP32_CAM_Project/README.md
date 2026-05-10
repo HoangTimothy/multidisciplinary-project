@@ -116,6 +116,17 @@ MJPEG stream timeout is long but finite by default (`DADN_STREAM_TIMEOUT_MS
 300000`) so stale browser/ngrok clients are released after five minutes. Set it
 to `0` only if clients disconnect cleanly in your network.
 
+For lower latency, keep only one consumer connected to `/stream`, keep the
+laptop and ESP32-CAM on the same router, and tune:
+
+```cpp
+#define DADN_JPEG_QUALITY 24
+#define DADN_FRAME_DELAY_MS 15
+```
+
+Higher JPEG quality values produce smaller/lower-quality frames. Lower
+`DADN_FRAME_DELAY_MS` reduces latency but increases WiFi and ESP32 load.
+
 ## Board
 - Board: `esp32cam` (AI Thinker ESP32-CAM)
 - Framework: Arduino

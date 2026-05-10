@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include "esp_camera.h"
 #include <WiFi.h>
+#include <esp_wifi.h>
 #include <WebServer.h>
 
 #if __has_include("wifi_credentials.h")
@@ -64,11 +65,18 @@ static const int SERVER_PORT = 5000;
 #define DADN_STREAM_TIMEOUT_MS 300000
 #endif
 
+#ifndef DADN_JPEG_QUALITY
+#define DADN_JPEG_QUALITY 24
+#endif
+
+#ifndef DADN_FRAME_DELAY_MS
+#define DADN_FRAME_DELAY_MS 15
+#endif
+
 // Streaming + GPIO config
 #define STREAM_PORT 8081
 #define STATUS_LED 33
 #define ALERT_LED 4
-#define JPEG_QUALITY 20
 #define SEND_TO_SERVER_INTERVAL_MS 1000
 
 WebServer server(STREAM_PORT);
@@ -100,10 +108,10 @@ bool initCamera()
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG;
   config.frame_size = FRAMESIZE_QVGA;
-  config.jpeg_quality = JPEG_QUALITY;
+  config.jpeg_quality = DADN_JPEG_QUALITY;
   config.fb_count = 2;
   config.fb_location = CAMERA_FB_IN_PSRAM;
-  config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
+  config.grab_mode = CAMERA_GRAB_LATEST;
 
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK)
@@ -117,6 +125,7 @@ bool initCamera()
   s->set_vflip(s, DADN_CAMERA_VFLIP);
   s->set_hmirror(s, DADN_CAMERA_HMIRROR);
   Serial.printf("[INFO] Camera orientation vflip=%d hmirror=%d\n", DADN_CAMERA_VFLIP, DADN_CAMERA_HMIRROR);
+  Serial.printf("[INFO] Camera jpeg_quality=%d frame_delay_ms=%d\n", DADN_JPEG_QUALITY, DADN_FRAME_DELAY_MS);
   Serial.println("[INFO] Camera initialized");
   return true;
 }
@@ -125,6 +134,8 @@ void initWiFi()
 {
   WiFi.mode(WIFI_STA);
   WiFi.setSleep(false);
+  esp_wifi_set_ps(WIFI_PS_NONE);
+  WiFi.setTxPower(WIFI_POWER_19_5dBm);
 
   for (size_t i = 0; i < (sizeof(WIFI_CANDIDATES) / sizeof(WIFI_CANDIDATES[0])); ++i)
   {
@@ -162,6 +173,7 @@ void handleStream()
 {
   WiFiClient client = server.client();
   client.setTimeout(1);
+  client.setNoDelay(true);
   String response = "HTTP/1.1 200 OK\r\n";
   response += "Content-Type: multipart/x-mixed-replace; boundary=frame\r\n";
   response += "Cache-Control: no-store, no-cache, must-revalidate, max-age=0\r\n";
@@ -206,7 +218,14 @@ void handleStream()
       break;
     }
 
-    delay(60);
+    if (DADN_FRAME_DELAY_MS > 0)
+    {
+      delay(DADN_FRAME_DELAY_MS);
+    }
+    else
+    {
+      yield();
+    }
   }
 
   client.stop();

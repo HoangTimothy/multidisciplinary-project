@@ -131,6 +131,8 @@ class TestWifiConfigHelpers(unittest.TestCase):
                 vflip=True,
                 hmirror=False,
                 stream_timeout_ms=300000,
+                jpeg_quality=24,
+                frame_delay_ms=15,
                 enable_health_check=False,
             )
             text = path.read_text(encoding="utf-8")
@@ -138,6 +140,8 @@ class TestWifiConfigHelpers(unittest.TestCase):
         self.assertIn("#define DADN_CAMERA_VFLIP 1", text)
         self.assertIn("#define DADN_CAMERA_HMIRROR 0", text)
         self.assertIn("#define DADN_STREAM_TIMEOUT_MS 300000", text)
+        self.assertIn("#define DADN_JPEG_QUALITY 24", text)
+        self.assertIn("#define DADN_FRAME_DELAY_MS 15", text)
 
 
 class TestHostHints(unittest.TestCase):

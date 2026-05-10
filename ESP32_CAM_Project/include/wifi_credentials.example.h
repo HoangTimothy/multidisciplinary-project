@@ -20,3 +20,9 @@
 // Long enough for demos, finite so stale ngrok/browser clients are released.
 // Use 0 only if you are sure clients disconnect cleanly.
 #define DADN_STREAM_TIMEOUT_MS 300000
+
+// ESP32 camera JPEG quality: higher means smaller/lower quality.
+#define DADN_JPEG_QUALITY 24
+
+// Lower delay reduces visual latency but raises WiFi/CPU load.
+#define DADN_FRAME_DELAY_MS 15

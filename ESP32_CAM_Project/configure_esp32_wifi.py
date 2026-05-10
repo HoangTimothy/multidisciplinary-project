@@ -24,6 +24,8 @@ def write_credentials(
     vflip: bool,
     hmirror: bool,
     stream_timeout_ms: int,
+    jpeg_quality: int,
+    frame_delay_ms: int,
     enable_health_check: bool,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -42,6 +44,8 @@ def write_credentials(
                 f"#define DADN_CAMERA_VFLIP {1 if vflip else 0}",
                 f"#define DADN_CAMERA_HMIRROR {1 if hmirror else 0}",
                 f"#define DADN_STREAM_TIMEOUT_MS {stream_timeout_ms}",
+                f"#define DADN_JPEG_QUALITY {jpeg_quality}",
+                f"#define DADN_FRAME_DELAY_MS {frame_delay_ms}",
                 "",
             ]
         ),
@@ -64,6 +68,8 @@ def main() -> int:
     parser.add_argument("--vflip", action="store_true", help="Flip camera vertically")
     parser.add_argument("--hmirror", action="store_true", help="Mirror camera horizontally")
     parser.add_argument("--stream-timeout-ms", type=int, default=300000, help="Stop each MJPEG client after N ms. 0 means no timeout.")
+    parser.add_argument("--jpeg-quality", type=int, default=24, help="ESP32 camera JPEG quality. Higher is smaller/lower quality.")
+    parser.add_argument("--frame-delay-ms", type=int, default=15, help="Delay between streamed frames. Lower reduces latency but increases WiFi/CPU load.")
     parser.add_argument("--enable-health-check", action="store_true", help="Ping DADN API server from ESP32 loop")
     parser.add_argument("--upload", action="store_true", help="Run PlatformIO upload after writing credentials")
     parser.add_argument("--upload-port", default=None, help="Upload serial port, e.g. COM13")
@@ -77,6 +83,8 @@ def main() -> int:
         vflip=args.vflip,
         hmirror=args.hmirror,
         stream_timeout_ms=args.stream_timeout_ms,
+        jpeg_quality=args.jpeg_quality,
+        frame_delay_ms=args.frame_delay_ms,
         enable_health_check=args.enable_health_check,
     )
     print(f"[SUCCESS] Wrote local WiFi credentials: {CREDENTIALS_PATH}")
