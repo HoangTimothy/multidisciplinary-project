@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import List
 
 import mediapipe as mp
@@ -21,12 +22,17 @@ class DetectionItem:
 
 
 class ObstacleDetector:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        model_path: Path | str | None = None,
+        score_threshold: float | None = None,
+        max_results: int | None = None,
+    ) -> None:
         options = vision.ObjectDetectorOptions(
-            base_options=python.BaseOptions(model_asset_path=str(MODEL_PATH)),
+            base_options=python.BaseOptions(model_asset_path=str(model_path or MODEL_PATH)),
             running_mode=vision.RunningMode.IMAGE,
-            max_results=MAX_RESULTS,
-            score_threshold=SCORE_THRESHOLD,
+            max_results=max_results if max_results is not None else MAX_RESULTS,
+            score_threshold=score_threshold if score_threshold is not None else SCORE_THRESHOLD,
         )
         self.detector = vision.ObjectDetector.create_from_options(options)
 

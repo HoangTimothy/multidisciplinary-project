@@ -2,18 +2,19 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
 MODEL_DIR = BASE_DIR / "models"
-MODEL_PATH = MODEL_DIR / "efficientdet_lite0.tflite"
+MODEL_ID = "efficientdet_lite0_int8"
+MODEL_PATH = MODEL_DIR / "efficientdet_lite0_int8.tflite"
 MODEL_URL = (
     "https://storage.googleapis.com/mediapipe-models/object_detector/"
-    "efficientdet_lite0/float32/latest/efficientdet_lite0.tflite"
+    "efficientdet_lite0/int8/latest/efficientdet_lite0.tflite"
 )
 
 CAMERA_INDEX = 0
 FRAME_WIDTH = 640
 FRAME_HEIGHT = 480
-INFER_EVERY_N_FRAMES = 2
-SCORE_THRESHOLD = 0.45
-MAX_RESULTS = 8
+INFER_EVERY_N_FRAMES = 5
+SCORE_THRESHOLD = 0.4
+MAX_RESULTS = 10
 
 # Relative distance estimation thresholds based on bounding box area ratio.
 # These are starting values and should be tuned with real camera tests.
@@ -46,13 +47,82 @@ CLASS_WEIGHTS = {
 VI_LABELS = {
     "person": "người",
     "bicycle": "xe đạp",
-    "motorcycle": "xe máy",
     "car": "ô tô",
+    "motorcycle": "xe máy",
+    "airplane": "máy bay",
     "bus": "xe buýt",
+    "train": "tàu hỏa",
     "truck": "xe tải",
-    "chair": "ghế",
+    "boat": "thuyền",
+    "traffic light": "đèn giao thông",
+    "fire hydrant": "vòi cứu hỏa",
+    "stop sign": "biển báo dừng",
+    "parking meter": "đồng hồ đỗ xe",
     "bench": "ghế dài",
-    "potted plant": "chậu cây",
-    "suitcase": "va li",
+    "bird": "chim",
+    "cat": "mèo",
+    "dog": "chó",
+    "horse": "ngựa",
+    "sheep": "cừu",
+    "cow": "bò",
+    "elephant": "voi",
+    "bear": "gấu",
+    "zebra": "ngựa vằn",
+    "giraffe": "hươu cao cổ",
     "backpack": "ba lô",
+    "umbrella": "ô dù",
+    "handbag": "túi xách",
+    "tie": "cà vạt",
+    "suitcase": "va li",
+    "frisbee": "đĩa bay",
+    "skis": "ván trượt tuyết",
+    "snowboard": "ván trượt",
+    "sports ball": "bóng thể thao",
+    "kite": "diều",
+    "baseball bat": "gậy bóng chày",
+    "baseball glove": "găng tay bóng chày",
+    "skateboard": "ván trượt",
+    "surfboard": "ván lướt sóng",
+    "tennis racket": "vợt tennis",
+    "bottle": "chai lọ",
+    "wine glass": "ly rượu",
+    "cup": "cốc",
+    "fork": "nĩa",
+    "knife": "dao",
+    "spoon": "thìa",
+    "bowl": "bát",
+    "banana": "chuối",
+    "apple": "táo",
+    "sandwich": "bánh mì kẹp",
+    "orange": "cam",
+    "broccoli": "bông cải xanh",
+    "carrot": "cà rốt",
+    "hot dog": "xúc xích",
+    "pizza": "bánh pizza",
+    "donut": "bánh vòng",
+    "cake": "bánh ngọt",
+    "chair": "ghế",
+    "couch": "ghế sofa",
+    "potted plant": "chậu cây",
+    "bed": "giường",
+    "dining table": "bàn ăn",
+    "toilet": "bồn cầu",
+    "tv": "tivi",
+    "laptop": "máy tính xách tay",
+    "mouse": "chuột máy tính",
+    "remote": "điều khiển",
+    "keyboard": "bàn phím",
+    "cell phone": "điện thoại",
+    "microwave": "lò vi sóng",
+    "oven": "lò nướng",
+    "toaster": "máy nướng bánh mì",
+    "sink": "bồn rửa",
+    "refrigerator": "tủ lạnh",
+    "book": "sách",
+    "clock": "đồng hồ",
+    "vase": "bình hoa",
+    "scissors": "kéo",
+    "teddy bear": "gấu bông",
+    "hair drier": "máy sấy tóc",
+    "toothbrush": "bàn chải đánh răng",
 }

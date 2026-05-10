@@ -51,7 +51,7 @@
 
 \section*{Tóm tắt}
 \addcontentsline{toc}{section}{Tóm tắt}
-Đề tài xây dựng hệ thống cảnh báo vật cản bằng giọng nói cho người khiếm thị, sử dụng camera để thu nhận hình ảnh phía trước, mô hình EfficientDet-Lite0 để nhận diện vật thể và Decision Engine để chọn cảnh báo quan trọng nhất. Hệ thống tập trung vào pipeline tích hợp trên thiết bị biên: thu nhận ảnh, suy luận object detection, lọc vật thể liên quan đến an toàn di chuyển, ước lượng mức gần--xa tương đối, xác định hướng trái--giữa--phải và chuyển kết quả thành cảnh báo ngắn gọn.
+Đề tài xây dựng hệ thống cảnh báo vật cản bằng giọng nói cho người khiếm thị, sử dụng camera để thu nhận hình ảnh phía trước, mô hình EfficientDet-Lite0 int8 để nhận diện vật thể và Decision Engine để chọn cảnh báo quan trọng nhất. Hệ thống tập trung vào pipeline tích hợp trên thiết bị biên: thu nhận ảnh, suy luận object detection, lọc vật thể liên quan đến an toàn di chuyển, ước lượng mức gần--xa tương đối, xác định hướng trái--giữa--phải và chuyển kết quả thành cảnh báo ngắn gọn.
 
 Trong repository hiện tại, ESP32-CAM đóng vai trò nguồn camera mạng và phát luồng MJPEG qua Wi-Fi; mô hình AI chạy trên Raspberry Pi hoặc máy tính thử nghiệm bằng Python, MediaPipe và Flask. Do đó, thuật ngữ TinyML trong báo cáo được hiểu theo hướng dùng mô hình nhẹ và triển khai suy luận ở biên, không khẳng định mô hình đã chạy trực tiếp trên vi điều khiển ESP32-CAM. Báo cáo trình bày bối cảnh, cơ sở công nghệ, yêu cầu hệ thống, kiến trúc, thuật toán ra quyết định, cấu trúc phần mềm, quy trình demo, kế hoạch kiểm thử và những hạn chế cần cải thiện trước khi đánh giá khả năng sử dụng thực tế.
 \clearpage
@@ -92,13 +92,15 @@ TinyML là hướng triển khai mô hình học máy có kích thước nhỏ t
 ESP32-CAM AI Thinker là module tích hợp vi điều khiển ESP32, camera OV2640 và khả năng kết nối Wi-Fi. Firmware trong repository được phát triển bằng Arduino framework qua PlatformIO \citep{platformio}. Firmware khởi tạo camera, kết nối Wi-Fi, mở web server ở port \texttt{8081}, cung cấp trang trạng thái tại \texttt{/} và luồng MJPEG tại \texttt{/stream}. Cấu hình hiện tại dùng QVGA và JPEG quality 20 để cân bằng giữa tốc độ truyền và chất lượng hình ảnh.
 
 \subsection{EfficientDet-Lite0 và TensorFlow Lite}
-EfficientDet là họ mô hình object detection được thiết kế để cân bằng độ chính xác và chi phí tính toán \citep{tan2020efficientdet}. Phiên bản EfficientDet-Lite0 nhỏ hơn, phù hợp với các thiết bị biên và được cung cấp ở định dạng TensorFlow Lite \citep{tensorflowlite}. Trong hệ thống này, mô hình trả về danh sách detection gồm nhãn, độ tin cậy và bounding box.
+EfficientDet là họ mô hình object detection được thiết kế để cân bằng độ chính xác và chi phí tính toán \citep{tan2020efficientdet}. Phiên bản EfficientDet-Lite0 nhỏ hơn, phù hợp với các thiết bị biên và được cung cấp ở định dạng TensorFlow Lite \citep{tensorflowlite}. Repository hiện dùng biến thể int8 để giảm kích thước model và giảm chi phí suy luận trên Raspberry Pi so với bản float32. Trong hệ thống này, mô hình trả về danh sách detection gồm nhãn, độ tin cậy và bounding box.
 
 \subsection{MediaPipe Object Detector}
 MediaPipe cung cấp API Object Detector cho Python, giúp nạp mô hình \texttt{.tflite}, nhận ảnh đầu vào và trả về kết quả nhận diện ở dạng có cấu trúc \citep{mediapipeobjectdetector}. Nhờ đó, module \texttt{detector.py} tập trung vào chuyển đổi frame BGR sang RGB, chạy suy luận và chuẩn hóa kết quả thành các trường \texttt{label}, \texttt{score}, \texttt{x}, \texttt{y}, \texttt{w}, \texttt{h}.
 
+Để tránh chọn model theo cảm tính, repository bổ sung \texttt{model\_registry.py} và các file cấu hình trong \texttt{DADN/experiments/configs}. Các ứng viên hiện gồm EfficientDet-Lite0 int8 làm baseline, EfficientDet-Lite2 int8 cho hướng tăng độ chính xác, SSD MobileNetV2 float16/float32 cho hướng giảm latency, và EfficientDet-Lite0 float32 làm sanity check.
+
 \subsection{OpenCV, Flask và Text-to-Speech}
-OpenCV được dùng để giải mã JPEG từ MJPEG stream, resize frame và vẽ overlay trên video \citep{opencv}. Flask cung cấp dashboard web, endpoint video feed và các API trạng thái \citep{flask}. Repository cũng có module \texttt{tts\_engine.py} dùng \texttt{pyttsx3} để phát cảnh báo cục bộ, kèm cơ chế cooldown nhằm hạn chế lặp âm thanh.
+OpenCV được dùng để giải mã JPEG từ MJPEG stream, resize frame và vẽ overlay trên video \citep{opencv}. Flask cung cấp dashboard web, endpoint video feed và các API trạng thái \citep{flask}; khi chạy demo production, launcher dùng Waitress thay cho Flask development server để phục vụ nhiều kết nối ổn định hơn. Dashboard hiện có endpoint \texttt{/tts} tạo âm thanh tiếng Việt bằng \texttt{gTTS} và cache file MP3 theo nội dung cảnh báo; trình duyệt sẽ fallback sang Web Speech API nếu TTS server không phát được. Module \texttt{tts\_engine.py} vẫn giữ vai trò phát cảnh báo cục bộ bằng \texttt{pyttsx3} trong các luồng thử nghiệm khác.
 
 \subsection{ngrok trong kịch bản demo}
 Khi ESP32-CAM và DADN server không nằm cùng mạng, ngrok có thể tạo public URL cho luồng camera hoặc dashboard \citep{ngrok}. Các script \texttt{auto\_camera\_ngrok.py}, \texttt{expose\_esp32\_ngrok.py} và \texttt{expose\_dashboard\_ngrok.py} hỗ trợ tự dò camera, mở tunnel và ghi URL vào file runtime đã được gitignore.
@@ -158,7 +160,7 @@ Về mặt kiến trúc, hệ thống có hai mặt phẳng xử lý. \textit{Da
     \node[layer, right=of cam] (transport) {Transport\\HTTP MJPEG\\LAN/ngrok};
     \node[layer, right=of transport] (ingest) {Ingestion\\byte stream parser\\JPEG decode};
     \node[state, below=of ingest] (buffer) {Shared state\\latest frame\\last detection};
-    \node[service, left=of buffer] (infer) {Inference worker\\sample every $N$ frames\\EfficientDet-Lite0};
+    \node[service, left=of buffer] (infer) {Inference worker\\latest-frame queue\\EfficientDet-Lite0 int8};
     \node[service, left=of infer] (decision) {Decision Engine\\class filter\\risk scoring};
     \node[service, below=of decision] (alert) {Alert output\\spoken text\\cooldown/TTS};
     \node[service, below=of buffer] (dashboard) {Presentation\\Flask dashboard\\video feed};
@@ -191,7 +193,7 @@ Về mặt kiến trúc, hệ thống có hai mặt phẳng xử lý. \textit{Da
     Acquisition & Cấu hình sensor OV2640, lấy frame JPEG, duy trì Wi-Fi và phát endpoint \texttt{/stream}. \\
     Transport & Chuyển luồng MJPEG qua LAN; khi demo khác mạng có thể bọc bằng ngrok mà không thay đổi DADN server. \\
     Ingestion & Đọc byte stream, tách từng JPEG bằng marker SOI/EOI, decode sang frame BGR và cập nhật frame mới nhất. \\
-    Inference worker & Không suy luận mọi frame; chỉ chạy mỗi $N$ frame để giảm tải CPU và giữ dashboard phản hồi được. \\
+    Inference worker & Không suy luận mọi frame; chỉ lấy frame mới nhất qua queue nhỏ để giảm tải CPU và tránh tích lũy độ trễ. \\
     Decision Engine & Lọc lớp vật thể liên quan, tính mức gần--xa tương đối, vùng trái--giữa--phải và chọn cảnh báo ưu tiên. \\
     Presentation/API & Render video đã overlay, hiển thị alert, cung cấp \texttt{/health}, \texttt{/api/stats} và \texttt{/api/config}. \\
     \bottomrule
@@ -199,20 +201,22 @@ Về mặt kiến trúc, hệ thống có hai mặt phẳng xử lý. \textit{Da
 \end{table}
 
 \subsection{Luồng xử lý dữ liệu}
-Luồng dữ liệu được tổ chức theo kiểu producer--consumer để tránh việc giao diện web bị phụ thuộc trực tiếp vào tốc độ suy luận của mô hình. Thread capture đóng vai trò producer: nó giữ kết nối tới ESP32-CAM, đọc byte stream, tách JPEG frame và cập nhật frame mới nhất vào vùng trạng thái dùng chung. Detector chỉ được gọi theo chu kỳ \texttt{INFERENCE\_EVERY\_N\_FRAMES}; giữa hai lần suy luận, dashboard vẫn có thể hiển thị frame mới và dùng lại kết quả detection gần nhất.
+Luồng dữ liệu được tổ chức theo kiểu producer--consumer để tránh việc giao diện web bị phụ thuộc trực tiếp vào tốc độ suy luận của mô hình. Thread capture đóng vai trò producer: nó giữ kết nối tới ESP32-CAM hoặc camera bridge, đọc byte stream, tách JPEG frame, decode bằng OpenCV và cập nhật frame mới nhất vào vùng trạng thái dùng chung. Detector chạy trong \texttt{inference\_worker} riêng; mỗi chu kỳ \texttt{INFERENCE\_EVERY\_N\_FRAMES}, capture thread chỉ đưa frame mới nhất vào queue kích thước nhỏ. Nếu queue còn frame cũ, frame cũ bị bỏ để ưu tiên độ trễ thấp hơn là xử lý đủ mọi frame.
+
+Thiết kế này khác với cách chạy tuần tự ``đọc frame rồi suy luận rồi mới stream''. Route \texttt{/video\_feed} được đánh thức khi có frame mới, nên dashboard vẫn mượt trong lúc inference đang chạy. Overlay sử dụng kết quả detection gần nhất; khi inference worker hoàn tất, shared state được cập nhật và các frame tiếp theo sẽ hiển thị bounding box/cảnh báo mới.
 
 Quy trình data plane gồm các bước chính:
 \begin{enumerate}
   \item ESP32-CAM chụp frame ở định dạng JPEG và phát dưới dạng multipart MJPEG tại \texttt{/stream}.
   \item DADN server mở kết nối HTTP tới stream URL, đọc dữ liệu theo chunk và tìm cặp marker JPEG \texttt{0xFFD8}/\texttt{0xFFD9}.
-  \item Mỗi JPEG hoàn chỉnh được decode bằng OpenCV thành frame BGR. Frame mới nhất được ghi vào buffer có khóa để route web không đọc trạng thái dở dang.
-  \item Cứ mỗi $N$ frame, server đưa frame vào MediaPipe Object Detector. Cách lấy mẫu này giảm tải tính toán nhưng vẫn giữ được nhịp cập nhật hình ảnh.
+  \item Mỗi JPEG hoàn chỉnh được decode bằng OpenCV thành frame BGR. Frame mới nhất được ghi vào buffer có khóa và \texttt{Condition} để route web không polling rỗng.
+  \item Cứ mỗi $N$ frame, server đưa bản sao frame mới nhất vào queue inference kích thước 1. Cách lấy mẫu này giảm tải tính toán và tránh backlog khi model chạy chậm hơn camera.
   \item Danh sách detection được chuẩn hóa thành \texttt{DetectionItem} rồi chuyển vào Decision Engine để tạo \texttt{ScoredObstacle}.
   \item Kết quả cảnh báo gần nhất được lưu trong shared state. Dashboard dùng trạng thái này để vẽ bounding box, thông điệp cảnh báo và thống kê FPS/inference.
   \item Nếu stream mất kết nối hoặc không đọc được chunk mới, capture loop ghi log lỗi, chờ ngắn hạn rồi thử kết nối lại thay vì làm sập Flask server.
 \end{enumerate}
 
-Luồng control/monitoring chạy song song với data plane. Endpoint \texttt{/health} dùng để xác nhận server còn sống và stream vẫn đang cập nhật; \texttt{/api/stats} phục vụ đo FPS, số frame, số lần suy luận và cảnh báo gần nhất; \texttt{/api/config} giúp ghi nhận cấu hình khi nghiệm thu. Nhờ đó, nhóm có thể phân biệt lỗi do camera, mạng, model hay dashboard thay vì chỉ nhìn một cửa sổ video bị đứng.
+Luồng control/monitoring chạy song song với data plane. Endpoint \texttt{/health} dùng để xác nhận server còn sống và trạng thái kết nối camera; \texttt{/api/stats} phục vụ đo FPS, số frame, số lần suy luận và cảnh báo gần nhất; \texttt{/api/config} giúp ghi nhận cấu hình khi nghiệm thu. Nhờ đó, nhóm có thể phân biệt lỗi do camera, mạng, model hay dashboard thay vì chỉ nhìn một cửa sổ video bị đứng.
 
 \section{Thiết kế Decision Engine}
 
@@ -260,7 +264,7 @@ Priority ={}& ClassWeight \times DistanceWeight \times CenterWeight \\
 Vật thể có \texttt{Priority} cao nhất được chọn làm cảnh báo chính tại thời điểm hiện tại. Cách chấm điểm dạng nhân giúp các vật thể nguy hiểm hơn, ví dụ người hoặc xe nằm gần vùng trung tâm, nổi bật hơn các vật thể ở rìa hoặc có confidence thấp.
 
 \subsection{Sinh câu cảnh báo và chống lặp âm thanh}
-Decision Engine sinh câu cảnh báo tiếng Việt theo mức gần--xa và hướng, ví dụ ``Cẩn thận, có người ở giữa, rất gần''. Module \texttt{VoiceAlertManager} dùng \texttt{pyttsx3}, lưu thông điệp gần nhất và chỉ phát lại khi qua thời gian cooldown hoặc khi mức rủi ro tăng. Trong dashboard hiện tại, \texttt{spoken\_text} được hiển thị cùng frame; khi tích hợp TTS vào luồng demo, cần ưu tiên chạy bất đồng bộ để không chặn luồng camera.
+Decision Engine sinh câu cảnh báo tiếng Việt theo mức gần--xa và hướng, ví dụ ``Cẩn thận, có người ở giữa, rất gần''. Module \texttt{VoiceAlertManager} dùng \texttt{pyttsx3}, lưu thông điệp gần nhất và chỉ phát lại khi qua thời gian cooldown hoặc khi mức rủi ro tăng. Trong dashboard stream, \texttt{spoken\_text} được trả về trong \texttt{/api/stats}; trình duyệt gọi endpoint \texttt{/tts} để phát MP3 tiếng Việt được cache theo nội dung. Nút Sound trên dashboard cho phép bật/tắt cảnh báo âm thanh, và phía client có kiểm tra chống phát lặp cùng một câu trong khoảng thời gian ngắn.
 
 \section{Triển khai phần mềm}
 
@@ -275,10 +279,13 @@ Decision Engine sinh câu cảnh báo tiếng Việt theo mức gần--xa và h�
     \textbf{Module} & \textbf{Vai trò} \\
     \midrule
     \filepath{ESP32_CAM_Project/src/main.cpp} & Firmware ESP32-CAM: khởi tạo camera, Wi-Fi, web server và MJPEG stream. \\
-    \filepath{DADN/stream_server.py} & Server demo chính: đọc MJPEG stream, chạy inference nền, vẽ overlay và xuất dashboard Flask. \\
-    \filepath{DADN/run_stream_server.py} & Launcher cho stream server, nhận camera URL từ tham số, biến môi trường hoặc file runtime. \\
+    \filepath{DADN/stream_server.py} & Server demo chính: đọc MJPEG stream, tách capture/video khỏi inference, vẽ overlay, cung cấp dashboard Flask và endpoint \texttt{/tts}. \\
+    \filepath{DADN/run_stream_server.py} & Launcher cho stream server, nhận camera URL từ tham số, biến môi trường hoặc file runtime; chạy Waitress khi không bật debug. \\
     \filepath{DADN/detector.py} & Wrapper MediaPipe Object Detector, chuẩn hóa detection thành dataclass. \\
     \filepath{DADN/decision_engine.py} & Lọc vật thể, ước lượng gần--xa, xác định hướng, tính priority và sinh câu cảnh báo. \\
+    \filepath{DADN/benchmark_inference.py} & Benchmark offline cho ảnh/video dataset, xuất \texttt{metrics.csv} và \texttt{summary.json}. \\
+    \filepath{DADN/benchmark_stream.py} & Thu thập runtime metrics từ \texttt{/api/stats} khi dashboard đang chạy. \\
+    \filepath{DADN/model_registry.py} & Registry model ứng viên và URL tải model chính thức để đổi model không sửa detector. \\
     \filepath{DADN/tts_engine.py} & Quản lý Text-to-Speech bằng \texttt{pyttsx3}, cooldown và phát lại khi mức rủi ro tăng. \\
     \filepath{DADN/api_server.py} & API nhận ảnh qua POST \texttt{/api/detect}, phù hợp nếu client gửi từng JPEG. \\
     \filepath{DADN/expose_dashboard_ngrok.py} & Chạy hoặc tái sử dụng dashboard DADN rồi expose port 5000 qua ngrok. \\
@@ -288,7 +295,9 @@ Decision Engine sinh câu cảnh báo tiếng Việt theo mức gần--xa và h�
 \end{table}
 
 \subsection{Cấu hình quan trọng}
-Các tham số quan trọng được gom vào \texttt{config.py}, gồm đường dẫn model, kích thước frame, chu kỳ suy luận, ngưỡng confidence, số detection tối đa, ngưỡng gần--xa, vùng trung tâm, cooldown giọng nói và nhãn tiếng Việt. Việc gom cấu hình giúp nhóm dễ tinh chỉnh khi chuyển từ laptop sang Raspberry Pi hoặc khi đổi camera.
+Các tham số quan trọng được gom vào \texttt{config.py}, gồm đường dẫn model, URL tải model EfficientDet-Lite0 int8, kích thước frame, chu kỳ suy luận, ngưỡng confidence, số detection tối đa, ngưỡng gần--xa, vùng trung tâm, cooldown giọng nói và nhãn tiếng Việt. Sau benchmark laptop trên subset COCO+BDD, cấu hình hiện tại dùng \texttt{INFER\_EVERY\_N\_FRAMES = 5}, \texttt{SCORE\_THRESHOLD = 0.4} và \texttt{MAX\_RESULTS = 10} để tăng recall nhưng vẫn giữ model int8 nhẹ cho Raspberry Pi. Việc gom cấu hình giúp nhóm dễ tinh chỉnh khi chuyển từ laptop sang Raspberry Pi hoặc khi đổi camera.
+
+Với benchmark, cấu hình được tách thành JSON để mô tả một experiment đầy đủ: model, threshold, số detection, kích thước frame, chu kỳ inference, queue size, ngưỡng gần--xa, vùng trung tâm, trọng số distance/center/direction và cooldown âm thanh. Cách này giúp chạy lại cùng một cấu hình trên laptop hoặc Raspberry Pi và so sánh kết quả bằng cùng một format.
 
 \subsection{Dashboard và API}
 Dashboard Flask cung cấp các endpoint chính:
@@ -298,6 +307,7 @@ Dashboard Flask cung cấp các endpoint chính:
   \item \texttt{/health}: trạng thái server, FPS, số frame và số lần suy luận.
   \item \texttt{/api/stats}: thống kê inference, cảnh báo gần nhất và cấu hình runtime.
   \item \texttt{/api/config}: cấu hình server hiện tại.
+  \item \texttt{/tts}: sinh và cache file MP3 tiếng Việt cho câu cảnh báo trên dashboard.
 \end{itemize}
 
 \subsection{Quy trình vận hành ESP32-CAM}
@@ -328,6 +338,10 @@ Firmware ESP32-CAM giữ Wi-Fi ở dạng placeholder để tránh lộ credenti
 \subsection{Mục tiêu kiểm thử}
 Kiểm thử nhằm xác nhận hệ thống không chỉ nhận diện vật thể, mà còn chọn đúng vật thể cần cảnh báo, xác định đúng hướng, phản ứng hợp lý với mức gần--xa tương đối và phục hồi được khi stream gián đoạn.
 
+Sau khi cập nhật pipeline stream, nhóm đã chạy kiểm tra tự động ở mức repository. Các kiểm tra gồm compile cú pháp Python cho \texttt{stream\_server.py}, \texttt{run\_stream\_server.py}, \texttt{config.py}, smoke test route Flask bằng test client và test các helper ngrok. Kết quả hiện tại là 20 test passed, 3 integration test skipped vì các test đó cần server thật và biến môi trường \texttt{DADN\_TEST\_SERVER\_URL}. Điều này xác nhận phần helper và route cơ bản hoạt động, nhưng chưa thay thế cho kiểm thử thực nghiệm với camera thật.
+
+Sau phần tuning, test tự động được mở rộng cho model registry, experiment config, decision-parameter override và policy chọn winner. Benchmark runner đã có chế độ \texttt{--dry-run} để kiểm tra dataset/config/output mà không cần nạp model; khi chạy thật, runner đo \texttt{avg/p50/p95} latency, detection rate, alert rate, alert correctness và điểm balanced score. Policy chốt model yêu cầu tối thiểu 200 mẫu có nhãn và \texttt{alert\_correctness >= 0.75}; nếu các điểm balanced score sát nhau dưới 0.03 thì ưu tiên p95 latency thấp hơn. Benchmark public subset 500 ảnh COCO+BDD đã chọn \texttt{tuned\_lite0\_int8\_high\_recall}: EfficientDet-Lite0 int8 với \texttt{SCORE\_THRESHOLD = 0.4}, \texttt{MAX\_RESULTS = 10}.
+
 \begin{table}[H]
   \centering
   \caption{Kịch bản kiểm thử đề xuất}
@@ -343,12 +357,14 @@ Kiểm thử nhằm xác nhận hệ thống không chỉ nhận diện vật th
     4 & Nhiều vật thể cùng lúc: người ở giữa, xe đạp ở rìa trái & Ưu tiên người ở giữa & Thuật toán chọn vật thể ưu tiên đúng \\
     5 & Stream ESP32-CAM mất kết nối & Server retry sau 2 giây và không crash & Khả năng phục hồi kết nối \\
     6 & Dashboard public qua ngrok & \texttt{/health}, \texttt{/video\_feed}, \texttt{/api/stats} truy cập được & Demo remote chạy được \\
+    7 & Pipeline video khi inference chậm & \texttt{/video\_feed} vẫn trả frame mới, overlay dùng detection gần nhất & Không backlog frame, queue inference giữ frame mới nhất \\
+    8 & Cảnh báo TTS trên dashboard & \texttt{/api/stats} có \texttt{spoken\_text}, \texttt{/tts} trả audio hoặc client fallback & Âm thanh không phát lặp liên tục \\
     \bottomrule
   \end{tabularx}
 \end{table}
 
 \subsection{Chỉ số cần đo thực nghiệm}
-Nhóm chưa nên ghi số liệu định lượng nếu chưa đo trực tiếp trên thiết bị demo. Các chỉ số cần cập nhật khi nghiệm thu gồm:
+Benchmark offline trên laptop đã có runner, dataset public subset và policy chọn model. Kết quả này đủ để chọn production candidate laptop-first, nhưng vẫn cần nghiệm thu runtime trên Raspberry Pi/ESP32-CAM trước khi gọi là cấu hình production phần cứng.
 \begin{table}[H]
   \centering
   \caption{Bảng chỉ số thực nghiệm cần cập nhật sau khi chạy demo}
@@ -357,11 +373,11 @@ Nhóm chưa nên ghi số liệu định lượng nếu chưa đo trực tiếp 
     \toprule
     \textbf{Chỉ số} & \textbf{Cách đo} & \textbf{Giá trị hiện tại} \\
     \midrule
-    FPS trung bình & Ghi nhận FPS hiển thị hoặc \texttt{current\_fps} trong \texttt{/api/stats} trong 60 giây & Cần đo \\
-    Độ trễ suy luận & Thời gian từ lúc nhận frame đến khi có danh sách detection & Cần đo \\
-    Độ trễ end-to-end & Thời gian từ lúc vật cản xuất hiện đến khi dashboard/TTS hiển thị cảnh báo & Cần đo \\
-    Tỷ lệ cảnh báo đúng vật thể ưu tiên & Số tình huống chọn đúng vật nguy hiểm nhất trên tổng số tình huống test & Cần đo \\
-    Độ ổn định stream & Số lần reconnect trong 5 phút với LAN và ngrok & Cần đo \\
+    FPS trung bình & Ghi nhận FPS hiển thị hoặc \texttt{current\_fps} trong \texttt{/api/stats} trong 60 giây & Chưa đo trên Pi; cần nghiệm thu runtime \\
+    Độ trễ suy luận & Thời gian suy luận offline trên laptop theo \texttt{benchmark\_inference.py} & Winner \texttt{tuned\_lite0\_int8\_high\_recall}: p95 31.4 ms, avg 28.1 ms trên 500 ảnh \\
+    Độ trễ end-to-end & Thời gian từ lúc vật cản xuất hiện đến khi dashboard/TTS hiển thị cảnh báo & Chưa đo trên Pi; cần đo cùng ESP32-CAM và dashboard \\
+    Tỷ lệ cảnh báo đúng vật thể ưu tiên & Số tình huống chọn đúng vật nguy hiểm nhất trên tổng số tình huống test & Group-level \texttt{alert\_correctness = 0.812} trên subset COCO+BDD 500 ảnh \\
+    Độ ổn định stream & Số lần reconnect trong 5 phút với LAN và ngrok & Chưa đo trên Pi; cần nghiệm thu LAN và ngrok \\
     \bottomrule
   \end{tabularx}
 \end{table}
@@ -371,7 +387,7 @@ Nhóm chưa nên ghi số liệu định lượng nếu chưa đo trực tiếp 
 \subsection{Hạn chế hiện tại}
 Hệ thống chưa đo được khoảng cách tuyệt đối theo mét vì chỉ dùng một camera RGB. Heuristic area ratio có thể sai khi vật thể có kích thước thật khác nhau hoặc bị crop. Decision Engine hiện chưa tracking cùng một vật qua nhiều frame, nên cảnh báo có thể dao động khi detection thay đổi. Nếu dùng ESP32-CAM qua Wi-Fi hoặc ngrok, độ trễ mạng có thể ảnh hưởng đến thời điểm cảnh báo.
 
-Ngoài ra, \texttt{tts\_engine.py} đã tồn tại nhưng chưa phải luồng chính trong dashboard stream. Trước demo chính thức, nhóm cần xác định rõ cảnh báo giọng nói sẽ phát từ server, từ trình duyệt hay từ thiết bị ngoài.
+Ngoài ra, dashboard hiện phát TTS ở phía trình duyệt bằng audio lấy từ endpoint \texttt{/tts}; cách này thuận tiện cho demo nhưng còn phụ thuộc mạng nếu dùng \texttt{gTTS}. Khi chuyển sang thiết bị đeo độc lập, nhóm cần quyết định rõ cảnh báo giọng nói sẽ phát trực tiếp trên Raspberry Pi bằng engine offline, từ trình duyệt dashboard hay từ một thiết bị audio riêng.
 
 \subsection{Rủi ro khi triển khai thực tế}
 Các rủi ro quan trọng gồm cảnh báo sai lớp vật thể, bỏ sót vật cản thấp không có trong tập lớp COCO, lặp cảnh báo gây mất tập trung, và trễ tổng thể quá lớn khi người dùng di chuyển nhanh. Vì vậy, hệ thống cần được xem là công cụ hỗ trợ thử nghiệm, chưa đủ điều kiện sử dụng như thiết bị an toàn độc lập.
@@ -382,7 +398,7 @@ Các hướng mở rộng phù hợp gồm:
 \begin{itemize}
   \item Bổ sung tracking ngắn hạn để giảm nhấp nháy alert giữa các frame.
   \item Nâng cấp từ heuristic area ratio sang TTC proxy hoặc monocular depth có hiệu chỉnh.
-  \item Tích hợp \texttt{tts\_engine.py} vào \texttt{stream\_server.py} theo hướng bất đồng bộ để không chặn luồng camera.
+  \item Tích hợp TTS offline bất đồng bộ hoàn chỉnh để không phụ thuộc dịch vụ mạng khi chạy ngoài hiện trường.
   \item Thêm trang cấu hình dashboard để nhập stream URL, inference interval và threshold mà không sửa code.
   \item Tinh chỉnh hoặc huấn luyện mô hình với dữ liệu thực tế tại Việt Nam, đặc biệt là xe máy, vỉa hè và vật cản thấp.
   \item Đo và tối ưu end-to-end latency trên Raspberry Pi thay vì chỉ kiểm tra trên laptop.

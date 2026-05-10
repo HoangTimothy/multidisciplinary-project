@@ -33,10 +33,37 @@ class ScoredObstacle:
 
 
 class DecisionEngine:
-    def __init__(self, frame_width: int, frame_height: int) -> None:
+    def __init__(
+        self,
+        frame_width: int,
+        frame_height: int,
+        *,
+        near_area_ratio: float = NEAR_AREA_RATIO,
+        medium_area_ratio: float = MEDIUM_AREA_RATIO,
+        center_zone_min_x: float = CENTER_ZONE_MIN_X,
+        center_zone_max_x: float = CENTER_ZONE_MAX_X,
+        lower_zone_min_y: float = LOWER_ZONE_MIN_Y,
+        class_weights: Optional[dict[str, float]] = None,
+        distance_weights: Optional[dict[str, float]] = None,
+        center_weight: float = 1.15,
+        off_center_weight: float = 0.85,
+        center_direction_weight: float = 1.0,
+        side_direction_weight: float = 0.92,
+    ) -> None:
         self.frame_width = frame_width
         self.frame_height = frame_height
         self.frame_area = frame_width * frame_height
+        self.near_area_ratio = near_area_ratio
+        self.medium_area_ratio = medium_area_ratio
+        self.center_zone_min_x = center_zone_min_x
+        self.center_zone_max_x = center_zone_max_x
+        self.lower_zone_min_y = lower_zone_min_y
+        self.class_weights = class_weights or CLASS_WEIGHTS
+        self.distance_weights = distance_weights or {"near": 1.35, "medium": 1.05, "far": 0.75}
+        self.center_weight = center_weight
+        self.off_center_weight = off_center_weight
+        self.center_direction_weight = center_direction_weight
+        self.side_direction_weight = side_direction_weight
 
     def choose_alert(self, detections: Iterable[DetectionItem]) -> Optional[ScoredObstacle]:
         candidates = [self._score_detection(item) for item in detections]
@@ -46,7 +73,7 @@ class DecisionEngine:
         return max(candidates, key=lambda item: item.priority)
 
     def _score_detection(self, det: DetectionItem) -> Optional[ScoredObstacle]:
-        class_weight = CLASS_WEIGHTS.get(det.label)
+        class_weight = self.class_weights.get(det.label)
         if class_weight is None:
             return None
 
@@ -55,12 +82,12 @@ class DecisionEngine:
         bottom_y_ratio = (det.y + det.h) / self.frame_height
 
         horizontal_zone = self._horizontal_zone(center_x_ratio)
-        is_in_center_zone = CENTER_ZONE_MIN_X <= center_x_ratio <= CENTER_ZONE_MAX_X
-        is_in_lower_zone = bottom_y_ratio >= LOWER_ZONE_MIN_Y
+        is_in_center_zone = self.center_zone_min_x <= center_x_ratio <= self.center_zone_max_x
+        is_in_lower_zone = bottom_y_ratio >= self.lower_zone_min_y
 
         distance_level, distance_weight = self._distance_level(area_ratio, is_in_lower_zone)
-        center_weight = 1.15 if is_in_center_zone else 0.85
-        direction_weight = 1.00 if horizontal_zone == "giữa" else 0.92
+        center_weight = self.center_weight if is_in_center_zone else self.off_center_weight
+        direction_weight = self.center_direction_weight if horizontal_zone == "giữa" else self.side_direction_weight
         confidence_weight = max(0.4, det.score)
 
         priority = (
@@ -106,11 +133,10 @@ class DecisionEngine:
             return f"Có {label_vi} ở {horizontal_zone}, khoảng cách trung bình"
         return f"Có {label_vi} ở {horizontal_zone}, phía trước"
 
-    @staticmethod
-    def _distance_level(area_ratio: float, is_in_lower_zone: bool) -> tuple[str, float]:
+    def _distance_level(self, area_ratio: float, is_in_lower_zone: bool) -> tuple[str, float]:
         adjusted_ratio = area_ratio * (1.1 if is_in_lower_zone else 1.0)
-        if adjusted_ratio >= NEAR_AREA_RATIO:
-            return "gần", 1.35
-        if adjusted_ratio >= MEDIUM_AREA_RATIO:
-            return "trung bình", 1.05
-        return "xa", 0.75
+        if adjusted_ratio >= self.near_area_ratio:
+            return "gần", self.distance_weights["near"]
+        if adjusted_ratio >= self.medium_area_ratio:
+            return "trung bình", self.distance_weights["medium"]
+        return "xa", self.distance_weights["far"]

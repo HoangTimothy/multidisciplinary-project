@@ -6,12 +6,34 @@ Run this while server is running to verify setup
 
 import requests
 import json
+import os
 import sys
 from pathlib import Path
+
+try:
+    import pytest
+except ImportError:  # Keep this file runnable as a plain script.
+    pytest = None
 
 # Configuration
 SERVER_URL = "http://10.121.219.227:5000"  # Change this to your PC IP!
 TIMEOUT = 5
+
+
+if pytest is not None:
+    @pytest.fixture
+    def server_url():
+        value = os.getenv("DADN_TEST_SERVER_URL")
+        if not value:
+            pytest.skip("Set DADN_TEST_SERVER_URL to run integration API tests")
+        return value.rstrip("/")
+
+    @pytest.fixture
+    def image_path():
+        value = os.getenv("DADN_TEST_IMAGE", "test.jpg")
+        if not Path(value).exists():
+            pytest.skip("Set DADN_TEST_IMAGE or provide test.jpg to run /api/detect integration test")
+        return value
 
 def test_health(server_url):
     """Test /health endpoint"""

@@ -118,7 +118,7 @@ def main():
         print("   ✅ All dependencies found\n")
     except ImportError as e:
         print(f"   ❌ Missing package: {e}")
-        print("   Run: pip install -r requirements_api.txt")
+        print("   Run: pip install -r requirements.txt")
         sys.exit(1)
 
     # Get camera stream URL. ESP32_* names are kept for compatibility.
@@ -161,7 +161,7 @@ def main():
     # Import and run server
     print("🔄 Initializing models...")
     try:
-        from stream_server import app, init_models, capture_stream
+        from stream_server import app, init_models, capture_stream, inference_worker
         import threading
         
         init_models()
@@ -174,6 +174,10 @@ def main():
         capture_thread = threading.Thread(target=capture_stream, daemon=True)
         capture_thread.start()
         print("✅ Capture thread started\n")
+
+        inference_thread = threading.Thread(target=inference_worker, daemon=True)
+        inference_thread.start()
+        print("✅ Inference thread started\n")
         
         # Print access info
         print("="*60)
@@ -204,14 +208,19 @@ def main():
             except:
                 pass
         
-        # Run Flask app
-        app.run(
-            host="0.0.0.0",
-            port=args.port,
-            debug=args.debug,
-            threaded=True,
-            use_reloader=False
-        )
+        if args.debug:
+            app.run(
+                host="0.0.0.0",
+                port=args.port,
+                debug=True,
+                threaded=True,
+                use_reloader=False,
+            )
+        else:
+            from waitress import serve
+
+            print(f"🚀 Starting production server on 0.0.0.0:{args.port}")
+            serve(app, host="0.0.0.0", port=args.port, threads=8)
         
     except Exception as e:
         print(f"❌ Error: {e}")

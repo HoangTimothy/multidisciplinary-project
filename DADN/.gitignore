@@ -7,6 +7,7 @@ __pycache__/
 
 # Model artifacts (download at runtime)
 models/
+experiments/results/
 .camera-ngrok-url
 .dadn-dashboard-url
 .dadn-dashboard-ngrok.json

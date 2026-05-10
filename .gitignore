@@ -1,0 +1,2 @@
+*.zip
+.pytest_cache/

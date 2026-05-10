@@ -339,6 +339,7 @@
                     <div class="controls">
                         <button class="btn-primary" onclick="refreshStats()">Refresh</button>
                         <button class="btn-danger" onclick="clearStats()">Clear</button>
+                        <button class="btn-primary" id="sound-btn" onclick="toggleSound()">🔊 Sound: ON</button>
                     </div>
                 </div>
             </div>
@@ -346,6 +347,42 @@
     </div>
 
     <script>
+        let soundEnabled = true;
+        let lastAlertText = '';
+        let lastAlertTime = 0;
+        let currentAudio = null;
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            document.getElementById('sound-btn').textContent = soundEnabled ? '🔊 Sound: ON' : '🔇 Sound: OFF';
+        }
+
+        function speakAlert(text) {
+            const now = Date.now();
+            if (!soundEnabled || !text) return;
+            if (text === lastAlertText && now - lastAlertTime < 3000) return;
+            lastAlertText = text;
+            lastAlertTime = now;
+
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio = null;
+            }
+            if (window.speechSynthesis) {
+                window.speechSynthesis.cancel();
+            }
+
+            currentAudio = new Audio('/tts?text=' + encodeURIComponent(text));
+            currentAudio.play().catch(function() {
+                if (window.speechSynthesis) {
+                    const utter = new SpeechSynthesisUtterance(text);
+                    utter.lang = 'vi-VN';
+                    utter.rate = 0.9;
+                    window.speechSynthesis.speak(utter);
+                }
+            });
+        }
+
         // Auto-refresh stats every 1 second
         setInterval(updateStats, 1000);
 
@@ -374,7 +411,7 @@
                 const alertPanel = document.getElementById('alert-content');
                 if (data.last_alert) {
                     const alert = data.last_alert;
-                    alertPanel.innerHTML = `
+                    const alertHtml = `
                         <div class="info-item">
                             <span class="info-label">Object:</span>
                             <span class="info-value">${alert.label}</span>
@@ -392,6 +429,11 @@
                             <span class="info-value">${alert.priority.toFixed(2)}</span>
                         </div>
                     `;
+                    alertPanel.innerHTML = alertHtml;
+
+                    if (alert.spoken_text) {
+                        speakAlert(alert.spoken_text);
+                    }
                 } else {
                     alertPanel.innerHTML = '<div class="alert-empty">No obstacles detected</div>';
                 }

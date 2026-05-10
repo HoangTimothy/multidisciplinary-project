@@ -1,0 +1,36 @@
+{
+  "experiment_id": "sanity_lite0_float16",
+  "description": "Float16 sanity comparison for EfficientDet-Lite0.",
+  "detector": {
+    "model_id": "efficientdet_lite0_float16",
+    "score_threshold": 0.5,
+    "max_results": 5
+  },
+  "runtime": {
+    "frame_width": 640,
+    "frame_height": 480,
+    "infer_every_n_frames": 5,
+    "jpeg_quality": 60,
+    "inference_queue_size": 1
+  },
+  "decision": {
+    "near_area_ratio": 0.18,
+    "medium_area_ratio": 0.06,
+    "center_zone_min_x": 0.25,
+    "center_zone_max_x": 0.75,
+    "lower_zone_min_y": 0.4,
+    "distance_weights": {
+      "near": 1.35,
+      "medium": 1.05,
+      "far": 0.75
+    },
+    "center_weight": 1.15,
+    "off_center_weight": 0.85,
+    "center_direction_weight": 1.0,
+    "side_direction_weight": 0.92
+  },
+  "alert": {
+    "speak_cooldown_seconds": 3.0,
+    "client_repeat_guard_seconds": 3.0
+  }
+}
