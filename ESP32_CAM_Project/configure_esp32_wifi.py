@@ -15,7 +15,17 @@ def c_string(value: str) -> str:
     return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-def write_credentials(path: Path, ssid: str, password: str, server_ip: str) -> None:
+def write_credentials(
+    path: Path,
+    ssid: str,
+    password: str,
+    server_ip: str,
+    *,
+    vflip: bool,
+    hmirror: bool,
+    stream_timeout_ms: int,
+    enable_health_check: bool,
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         "\n".join(
@@ -28,6 +38,10 @@ def write_credentials(path: Path, ssid: str, password: str, server_ip: str) -> N
                 "}",
                 "",
                 f"#define DADN_SERVER_IP {c_string(server_ip)}",
+                f"#define DADN_ENABLE_SERVER_HEALTH_CHECK {1 if enable_health_check else 0}",
+                f"#define DADN_CAMERA_VFLIP {1 if vflip else 0}",
+                f"#define DADN_CAMERA_HMIRROR {1 if hmirror else 0}",
+                f"#define DADN_STREAM_TIMEOUT_MS {stream_timeout_ms}",
                 "",
             ]
         ),
@@ -47,11 +61,24 @@ def main() -> int:
     parser.add_argument("--ssid", required=True, help="2.4 GHz WiFi SSID reachable by ESP32-CAM")
     parser.add_argument("--password", required=True, help="WiFi password")
     parser.add_argument("--server-ip", default="192.168.1.100", help="DADN/API server IP used by ESP32 health checks")
+    parser.add_argument("--vflip", action="store_true", help="Flip camera vertically")
+    parser.add_argument("--hmirror", action="store_true", help="Mirror camera horizontally")
+    parser.add_argument("--stream-timeout-ms", type=int, default=0, help="Stop each MJPEG client after N ms. 0 means no timeout.")
+    parser.add_argument("--enable-health-check", action="store_true", help="Ping DADN API server from ESP32 loop")
     parser.add_argument("--upload", action="store_true", help="Run PlatformIO upload after writing credentials")
     parser.add_argument("--upload-port", default=None, help="Upload serial port, e.g. COM13")
     args = parser.parse_args()
 
-    write_credentials(CREDENTIALS_PATH, args.ssid, args.password, args.server_ip)
+    write_credentials(
+        CREDENTIALS_PATH,
+        args.ssid,
+        args.password,
+        args.server_ip,
+        vflip=args.vflip,
+        hmirror=args.hmirror,
+        stream_timeout_ms=args.stream_timeout_ms,
+        enable_health_check=args.enable_health_check,
+    )
     print(f"[SUCCESS] Wrote local WiFi credentials: {CREDENTIALS_PATH}")
     print("[INFO] This file is gitignored and will not be committed.")
 

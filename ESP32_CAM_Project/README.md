@@ -22,6 +22,13 @@ On Windows with the current CH340 adapter:
 D:\DADN\venv\Scripts\python.exe configure_esp32_wifi.py --ssid "YOUR_2G_WIFI" --password "YOUR_WIFI_PASSWORD" --upload --upload-port COM13
 ```
 
+If the image is upside down or mirrored, set orientation during the same step:
+
+```powershell
+D:\DADN\venv\Scripts\python.exe configure_esp32_wifi.py --ssid "YOUR_2G_WIFI" --password "YOUR_WIFI_PASSWORD" --vflip --upload --upload-port COM13
+D:\DADN\venv\Scripts\python.exe configure_esp32_wifi.py --ssid "YOUR_2G_WIFI" --password "YOUR_WIFI_PASSWORD" --hmirror --upload --upload-port COM13
+```
+
 This writes `include/wifi_credentials.h`, then optionally uploads the firmware.
 You can also copy `include/wifi_credentials.example.h` manually.
 
@@ -104,6 +111,9 @@ The firmware keeps DADN API health checks disabled by default so the ESP32-CAM
 web server can focus on serving `/` and `/stream`. Enable
 `DADN_ENABLE_SERVER_HEALTH_CHECK` in `include/wifi_credentials.h` only when a
 local API server is already reachable from the ESP32-CAM.
+
+MJPEG stream timeout is disabled by default (`DADN_STREAM_TIMEOUT_MS 0`), so the
+browser/ngrok stream stays open until the viewer disconnects.
 
 ## Board
 - Board: `esp32cam` (AI Thinker ESP32-CAM)

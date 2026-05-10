@@ -117,6 +117,28 @@ class TestWifiConfigHelpers(unittest.TestCase):
     def test_c_string_escapes_quotes_and_backslashes(self):
         self.assertEqual(wifi_config.c_string('A"B\\C'), '"A\\"B\\\\C"')
 
+    def test_write_credentials_includes_stream_and_orientation_options(self):
+        from tempfile import TemporaryDirectory
+        from pathlib import Path
+
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "wifi_credentials.h"
+            wifi_config.write_credentials(
+                path,
+                "ssid",
+                "password",
+                "192.168.1.100",
+                vflip=True,
+                hmirror=False,
+                stream_timeout_ms=0,
+                enable_health_check=False,
+            )
+            text = path.read_text(encoding="utf-8")
+
+        self.assertIn("#define DADN_CAMERA_VFLIP 1", text)
+        self.assertIn("#define DADN_CAMERA_HMIRROR 0", text)
+        self.assertIn("#define DADN_STREAM_TIMEOUT_MS 0", text)
+
 
 class TestHostHints(unittest.TestCase):
     def test_parse_hosts_from_text_filters_noise(self):

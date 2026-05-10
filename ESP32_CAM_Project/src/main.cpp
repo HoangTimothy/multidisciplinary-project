@@ -52,12 +52,23 @@ static const int SERVER_PORT = 5000;
 #define DADN_ENABLE_SERVER_HEALTH_CHECK 0
 #endif
 
+#ifndef DADN_CAMERA_VFLIP
+#define DADN_CAMERA_VFLIP 0
+#endif
+
+#ifndef DADN_CAMERA_HMIRROR
+#define DADN_CAMERA_HMIRROR 0
+#endif
+
+#ifndef DADN_STREAM_TIMEOUT_MS
+#define DADN_STREAM_TIMEOUT_MS 0
+#endif
+
 // Streaming + GPIO config
 #define STREAM_PORT 8081
 #define STATUS_LED 33
 #define ALERT_LED 4
 #define JPEG_QUALITY 20
-#define STREAM_TIMEOUT_MS 10000
 #define SEND_TO_SERVER_INTERVAL_MS 1000
 
 WebServer server(STREAM_PORT);
@@ -103,6 +114,9 @@ bool initCamera()
 
   sensor_t *s = esp_camera_sensor_get();
   s->set_framesize(s, FRAMESIZE_QVGA);
+  s->set_vflip(s, DADN_CAMERA_VFLIP);
+  s->set_hmirror(s, DADN_CAMERA_HMIRROR);
+  Serial.printf("[INFO] Camera orientation vflip=%d hmirror=%d\n", DADN_CAMERA_VFLIP, DADN_CAMERA_HMIRROR);
   Serial.println("[INFO] Camera initialized");
   return true;
 }
@@ -149,13 +163,17 @@ void handleStream()
   WiFiClient client = server.client();
   String response = "HTTP/1.1 200 OK\r\n";
   response += "Content-Type: multipart/x-mixed-replace; boundary=frame\r\n";
+  response += "Cache-Control: no-store, no-cache, must-revalidate, max-age=0\r\n";
+  response += "Pragma: no-cache\r\n";
+  response += "Access-Control-Allow-Origin: *\r\n";
+  response += "X-Accel-Buffering: no\r\n";
   response += "Connection: close\r\n\r\n";
   client.write((const uint8_t *)response.c_str(), response.length());
 
-  uint32_t streamDeadline = millis() + STREAM_TIMEOUT_MS;
+  uint32_t streamDeadline = DADN_STREAM_TIMEOUT_MS > 0 ? millis() + DADN_STREAM_TIMEOUT_MS : 0;
   while (client.connected())
   {
-    if (millis() > streamDeadline)
+    if (DADN_STREAM_TIMEOUT_MS > 0 && millis() > streamDeadline)
     {
       Serial.println("[WARN] Stream timeout");
       break;
@@ -176,7 +194,7 @@ void handleStream()
     client.write((const uint8_t *)"\r\n", 2);
     esp_camera_fb_return(fb);
 
-    delay(100);
+    delay(60);
   }
 
   client.stop();
