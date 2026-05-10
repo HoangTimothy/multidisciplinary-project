@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from config import (
+    ALERT_PRIORITY_THRESHOLD,
     CENTER_ZONE_MAX_X,
     CENTER_ZONE_MIN_X,
     CLASS_WEIGHTS,
@@ -52,6 +53,7 @@ class DecisionParams:
     off_center_weight: float = 0.85
     center_direction_weight: float = 1.0
     side_direction_weight: float = 0.92
+    alert_priority_threshold: float = ALERT_PRIORITY_THRESHOLD
 
 
 @dataclass(frozen=True)

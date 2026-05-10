@@ -28,21 +28,7 @@ LOWER_ZONE_MIN_Y = 0.40
 
 SPEAK_COOLDOWN_SECONDS = 3.0
 REPEAT_IF_RISK_UPGRADED_SECONDS = 1.0
-
-# Only classes relevant to mobility safety should trigger alerts.
-CLASS_WEIGHTS = {
-    "person": 1.00,
-    "bicycle": 0.90,
-    "motorcycle": 1.00,
-    "car": 0.95,
-    "bus": 1.00,
-    "truck": 1.00,
-    "chair": 0.65,
-    "bench": 0.60,
-    "potted plant": 0.55,
-    "suitcase": 0.60,
-    "backpack": 0.45,
-}
+ALERT_PRIORITY_THRESHOLD = 0.45
 
 VI_LABELS = {
     "person": "người",
@@ -126,3 +112,23 @@ VI_LABELS = {
     "hair drier": "máy sấy tóc",
     "toothbrush": "bàn chải đánh răng",
 }
+
+# The detector is COCO-style, so keep all known COCO labels eligible for alert
+# scoring. Mobility-relevant objects get higher weights; everything else needs
+# stronger confidence/nearer geometry to pass ALERT_PRIORITY_THRESHOLD.
+DEFAULT_CLASS_WEIGHT = 0.35
+MOBILITY_CLASS_WEIGHTS = {
+    "person": 1.00,
+    "bicycle": 0.90,
+    "motorcycle": 1.00,
+    "car": 0.95,
+    "bus": 1.00,
+    "truck": 1.00,
+    "chair": 0.65,
+    "bench": 0.60,
+    "potted plant": 0.55,
+    "suitcase": 0.60,
+    "backpack": 0.45,
+}
+CLASS_WEIGHTS = {label: DEFAULT_CLASS_WEIGHT for label in VI_LABELS}
+CLASS_WEIGHTS.update(MOBILITY_CLASS_WEIGHTS)

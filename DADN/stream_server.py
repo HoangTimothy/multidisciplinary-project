@@ -25,7 +25,7 @@ import numpy as np
 from flask import Flask, Response, jsonify, render_template, request, send_file
 from PIL import Image, ImageDraw, ImageFont
 
-from config import FRAME_HEIGHT, FRAME_WIDTH, MAX_RESULTS, SCORE_THRESHOLD
+from config import ALERT_PRIORITY_THRESHOLD, FRAME_HEIGHT, FRAME_WIDTH, MAX_RESULTS, SCORE_THRESHOLD
 from decision_engine import DecisionEngine
 from detector import ObstacleDetector
 from model_utils import ensure_model
@@ -381,6 +381,7 @@ def api_stats():
                 "inference_every_n_frames": INFERENCE_EVERY_N_FRAMES,
                 "jpeg_quality": JPEG_QUALITY,
                 "score_threshold": SCORE_THRESHOLD,
+                "alert_priority_threshold": ALERT_PRIORITY_THRESHOLD,
                 "max_results": MAX_RESULTS,
             },
         }
@@ -397,6 +398,7 @@ def get_config():
             "jpeg_quality": JPEG_QUALITY,
             "frame_resolution": ESP32_CAM_RESOLUTION,
             "score_threshold": SCORE_THRESHOLD,
+            "alert_priority_threshold": ALERT_PRIORITY_THRESHOLD,
             "max_results": MAX_RESULTS,
         }
     ), 200

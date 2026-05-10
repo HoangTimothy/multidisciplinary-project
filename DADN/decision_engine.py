@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Iterable, Optional
 
 from config import (
+    ALERT_PRIORITY_THRESHOLD,
     CENTER_ZONE_MAX_X,
     CENTER_ZONE_MIN_X,
     CLASS_WEIGHTS,
@@ -49,6 +50,7 @@ class DecisionEngine:
         off_center_weight: float = 0.85,
         center_direction_weight: float = 1.0,
         side_direction_weight: float = 0.92,
+        alert_priority_threshold: float = ALERT_PRIORITY_THRESHOLD,
     ) -> None:
         self.frame_width = frame_width
         self.frame_height = frame_height
@@ -64,6 +66,7 @@ class DecisionEngine:
         self.off_center_weight = off_center_weight
         self.center_direction_weight = center_direction_weight
         self.side_direction_weight = side_direction_weight
+        self.alert_priority_threshold = alert_priority_threshold
 
     def choose_alert(self, detections: Iterable[DetectionItem]) -> Optional[ScoredObstacle]:
         candidates = [self._score_detection(item) for item in detections]
@@ -97,6 +100,8 @@ class DecisionEngine:
             * direction_weight
             * confidence_weight
         )
+        if priority < self.alert_priority_threshold:
+            return None
 
         label_vi = VI_LABELS.get(det.label, det.label)
         spoken_text = self._spoken_text(label_vi, distance_level, horizontal_zone)

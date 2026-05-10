@@ -130,6 +130,7 @@ def detect():
 def get_config():
     """Return current model configuration"""
     from config import (
+        ALERT_PRIORITY_THRESHOLD,
         FRAME_HEIGHT,
         FRAME_WIDTH,
         SCORE_THRESHOLD,
@@ -141,6 +142,7 @@ def get_config():
         "frame_width": FRAME_WIDTH,
         "frame_height": FRAME_HEIGHT,
         "score_threshold": SCORE_THRESHOLD,
+        "alert_priority_threshold": ALERT_PRIORITY_THRESHOLD,
         "max_results": MAX_RESULTS,
         "near_area_ratio": NEAR_AREA_RATIO,
         "medium_area_ratio": MEDIUM_AREA_RATIO,

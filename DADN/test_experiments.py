@@ -5,6 +5,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from decision_engine import DecisionEngine
 from detector import DetectionItem
+from config import ALERT_PRIORITY_THRESHOLD, CLASS_WEIGHTS, VI_LABELS
 from benchmark_inference import choose_winner
 from experiment_config import load_experiment_config
 from model_registry import get_model_spec
@@ -39,6 +40,22 @@ def test_decision_engine_accepts_tunable_thresholds():
     assert alert is not None
     assert alert.distance_level == "gần"
     assert alert.horizontal_zone == "giữa"
+
+
+def test_all_known_coco_labels_are_alert_candidates():
+    assert len(VI_LABELS) == 80
+    assert set(VI_LABELS).issubset(CLASS_WEIGHTS)
+
+
+def test_alert_priority_threshold_suppresses_weak_generic_alerts():
+    engine = DecisionEngine(640, 480, alert_priority_threshold=ALERT_PRIORITY_THRESHOLD)
+
+    weak_alert = engine.choose_alert([DetectionItem("book", 0.4, 260, 260, 160, 180)])
+    strong_alert = engine.choose_alert([DetectionItem("book", 0.95, 180, 120, 300, 320)])
+
+    assert weak_alert is None
+    assert strong_alert is not None
+    assert strong_alert.label == "book"
 
 
 def test_benchmark_winner_prefers_latency_when_scores_are_close():
