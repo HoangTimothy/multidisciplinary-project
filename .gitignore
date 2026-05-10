@@ -1,2 +1,3 @@
 *.zip
 .pytest_cache/
+.tools/

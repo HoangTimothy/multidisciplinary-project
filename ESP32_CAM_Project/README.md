@@ -115,6 +115,15 @@ Or let the launcher find the ESP32-CAM automatically, even if DHCP changes its I
 python auto_camera_ngrok.py
 ```
 
+One-command setup is available if `ngrok` is not installed yet. It downloads the
+ngrok agent into the ignored repo-local `.tools/` folder, configures the token
+from `NGROK_AUTHTOKEN`, scans for the ESP32-CAM, starts ngrok, and prints the
+public `/stream` URL:
+
+```bash
+NGROK_AUTHTOKEN=<YOUR_NGROK_TOKEN> python run_esp32_all.py
+```
+
 The auto launcher scans active local networks for an ESP32-CAM on port `8081`,
 starts/restarts ngrok, writes the public URL to `.esp32-ngrok-url`, and prints
 the Raspberry Pi command.
