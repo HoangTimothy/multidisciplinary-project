@@ -20,12 +20,18 @@ from config import (
     GENERIC_RISK_PRESERVE_LABELS,
     GENERIC_RISK_PRIORITY_THRESHOLD,
     INFER_EVERY_N_FRAMES,
+    INFERENCE_PREPROCESSING_ENABLED,
     LOWER_ZONE_MIN_Y,
     MAX_RESULTS,
     MEDIUM_AREA_RATIO,
     NEAR_AREA_RATIO,
+    PREPROCESS_DENOISE_ENABLED,
+    PREPROCESS_LOW_LIGHT_ENABLED,
     SCORE_THRESHOLD,
     SPEAK_COOLDOWN_SECONDS,
+    TEMPORAL_ALERT_HOLD_FRAMES,
+    TEMPORAL_ALERT_HOLD_SECONDS,
+    TEMPORAL_ALERT_SMOOTHING_ENABLED,
 )
 
 
@@ -36,6 +42,9 @@ class RuntimeParams:
     infer_every_n_frames: int = INFER_EVERY_N_FRAMES
     jpeg_quality: int = 60
     inference_queue_size: int = 1
+    inference_preprocessing_enabled: bool = INFERENCE_PREPROCESSING_ENABLED
+    preprocess_denoise_enabled: bool = PREPROCESS_DENOISE_ENABLED
+    preprocess_low_light_enabled: bool = PREPROCESS_LOW_LIGHT_ENABLED
 
 
 @dataclass(frozen=True)
@@ -74,6 +83,9 @@ class DecisionParams:
 class AlertParams:
     speak_cooldown_seconds: float = SPEAK_COOLDOWN_SECONDS
     client_repeat_guard_seconds: float = 3.0
+    temporal_smoothing_enabled: bool = TEMPORAL_ALERT_SMOOTHING_ENABLED
+    temporal_hold_frames: int = TEMPORAL_ALERT_HOLD_FRAMES
+    temporal_hold_seconds: float = TEMPORAL_ALERT_HOLD_SECONDS
 
 
 @dataclass(frozen=True)

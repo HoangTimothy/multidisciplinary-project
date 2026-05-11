@@ -145,3 +145,37 @@ Overall after tuning:
 This tune is worth keeping for the laptop/edge candidate because it improves
 missed-alert robustness without increasing measured p95 latency on the synthetic
 set. The remaining weakest cases are still center occlusion and noise.
+
+## Preprocessing and temporal smoothing run: 2026-05-11
+
+Added lightweight inference preprocessing and temporal alert smoothing:
+
+- Median denoise before inference.
+- CLAHE low-light enhancement when luminance is low.
+- Hold the latest alert for up to 2 inference frames or 0.8 seconds when a
+  short detector miss occurs.
+
+Benchmark summary: `DADN/experiments/results/20260511-215104/summary.json`.
+
+| Variant | Risk correctness | Strict group correctness | Detection rate | Alert rate |
+| --- | ---: | ---: | ---: | ---: |
+| `center_occlusion` | 0.756 | 0.638 | 0.868 | 0.756 |
+| `esp32_resize` | 0.846 | 0.716 | 0.926 | 0.846 |
+| `jpeg_low_quality` | 0.840 | 0.724 | 0.916 | 0.840 |
+| `low_light` | 0.838 | 0.712 | 0.912 | 0.838 |
+| `motion_blur` | 0.858 | 0.734 | 0.926 | 0.858 |
+| `noise` | 0.826 | 0.688 | 0.920 | 0.826 |
+
+Overall after preprocessing/smoothing:
+
+- `risk_alert_correctness`: 0.827, up from 0.816 after threshold tuning
+- `alert_correctness`: 0.702, up from 0.692
+- `detection_rate`: 0.911, up from 0.901
+- `p95_latency_ms`: 35.6 ms on laptop
+
+The synthetic image benchmark mainly measures preprocessing because frames are
+independent still images; temporal smoothing should be validated on a real
+ESP32 stream where short detector misses happen across adjacent frames. Noise
+improved the most (`0.774 -> 0.826`). Center occlusion remains weak
+(`0.770 -> 0.756`), so partial-object failure is still the strongest argument
+for a real-camera failure set and, if confirmed, fine-tuning or segmentation.

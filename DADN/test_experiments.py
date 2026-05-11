@@ -9,6 +9,7 @@ from config import ALERT_PRIORITY_THRESHOLD, CLASS_WEIGHTS, VI_LABELS
 from benchmark_inference import choose_winner, evaluate_alert
 from experiment_config import load_experiment_config
 from model_registry import get_model_spec
+from risk_smoothing import AlertSmoother
 
 
 def test_model_registry_baseline_spec():
@@ -87,6 +88,17 @@ def test_risk_correctness_ignores_wrong_group_when_alert_is_present():
 
     assert result["risk_correct"] is True
     assert result["correct"] is False
+
+
+def test_alert_smoother_holds_recent_alert_across_short_miss():
+    engine = DecisionEngine(640, 480, alert_priority_threshold=ALERT_PRIORITY_THRESHOLD)
+    smoother = AlertSmoother(hold_frames=2, hold_seconds=2.0)
+    alert = engine.choose_alert([DetectionItem("chair", 0.9, 200, 220, 220, 220)])
+
+    assert alert is not None
+    assert smoother.update(alert, frame_index=10, now_seconds=10.0) is alert
+    assert smoother.update(None, frame_index=11, now_seconds=10.5) is alert
+    assert smoother.update(None, frame_index=13, now_seconds=11.0) is None
 
 
 def test_benchmark_winner_prefers_latency_when_scores_are_close():

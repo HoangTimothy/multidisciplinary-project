@@ -25,10 +25,24 @@ import numpy as np
 from flask import Flask, Response, jsonify, render_template, request, send_file
 from PIL import Image, ImageDraw, ImageFont
 
-from config import ALERT_PRIORITY_THRESHOLD, FRAME_HEIGHT, FRAME_WIDTH, MAX_RESULTS, SCORE_THRESHOLD
+from config import (
+    ALERT_PRIORITY_THRESHOLD,
+    FRAME_HEIGHT,
+    FRAME_WIDTH,
+    INFERENCE_PREPROCESSING_ENABLED,
+    MAX_RESULTS,
+    PREPROCESS_DENOISE_ENABLED,
+    PREPROCESS_LOW_LIGHT_ENABLED,
+    SCORE_THRESHOLD,
+    TEMPORAL_ALERT_HOLD_FRAMES,
+    TEMPORAL_ALERT_HOLD_SECONDS,
+    TEMPORAL_ALERT_SMOOTHING_ENABLED,
+)
 from decision_engine import DecisionEngine
 from detector import ObstacleDetector
+from frame_preprocessing import preprocess_for_inference
 from model_utils import ensure_model
+from risk_smoothing import AlertSmoother
 
 app = Flask(__name__)
 
@@ -58,6 +72,10 @@ inference_queue: "queue.Queue[tuple[int, float, np.ndarray]]" = queue.Queue(maxs
 
 detector: Optional[ObstacleDetector] = None
 decision_engine: Optional[DecisionEngine] = None
+alert_smoother = AlertSmoother(
+    hold_frames=TEMPORAL_ALERT_HOLD_FRAMES,
+    hold_seconds=TEMPORAL_ALERT_HOLD_SECONDS,
+)
 
 frame_count = 0
 inference_count = 0
@@ -217,8 +235,24 @@ def inference_worker():
                 continue
 
             inf_start = time.time()
-            detections = detector.detect(frame_bgr)
-            alert = decision_engine.choose_alert(detections)
+            inference_frame = frame_bgr
+            if INFERENCE_PREPROCESSING_ENABLED:
+                inference_frame = preprocess_for_inference(
+                    frame_bgr,
+                    denoise_enabled=PREPROCESS_DENOISE_ENABLED,
+                    low_light_enabled=PREPROCESS_LOW_LIGHT_ENABLED,
+                )
+            detections = detector.detect(inference_frame)
+            raw_alert = decision_engine.choose_alert(detections)
+            alert = (
+                alert_smoother.update(
+                    raw_alert,
+                    frame_index=seq,
+                    now_seconds=time.time(),
+                )
+                if TEMPORAL_ALERT_SMOOTHING_ENABLED
+                else raw_alert
+            )
             inf_time = (time.time() - inf_start) * 1000
             completed_at = time.perf_counter()
             alert_latency_ms = (completed_at - queued_at) * 1000
@@ -249,6 +283,7 @@ def inference_worker():
                     "semantic_priority": float(alert.semantic_priority),
                     "collision_risk_priority": float(alert.collision_risk_priority),
                     "alert_kind": alert.alert_kind,
+                    "is_smoothed": raw_alert is None,
                     "spoken_text": alert.spoken_text,
                     "latency_ms": alert_latency_ms,
                     "timestamp": time.time(),
@@ -402,6 +437,10 @@ def api_stats():
                 "score_threshold": SCORE_THRESHOLD,
                 "alert_priority_threshold": ALERT_PRIORITY_THRESHOLD,
                 "max_results": MAX_RESULTS,
+                "temporal_smoothing_enabled": TEMPORAL_ALERT_SMOOTHING_ENABLED,
+                "temporal_hold_frames": TEMPORAL_ALERT_HOLD_FRAMES,
+                "temporal_hold_seconds": TEMPORAL_ALERT_HOLD_SECONDS,
+                "inference_preprocessing_enabled": INFERENCE_PREPROCESSING_ENABLED,
             },
         }
     ), 200
@@ -419,6 +458,10 @@ def get_config():
             "score_threshold": SCORE_THRESHOLD,
             "alert_priority_threshold": ALERT_PRIORITY_THRESHOLD,
             "max_results": MAX_RESULTS,
+            "temporal_smoothing_enabled": TEMPORAL_ALERT_SMOOTHING_ENABLED,
+            "temporal_hold_frames": TEMPORAL_ALERT_HOLD_FRAMES,
+            "temporal_hold_seconds": TEMPORAL_ALERT_HOLD_SECONDS,
+            "inference_preprocessing_enabled": INFERENCE_PREPROCESSING_ENABLED,
         }
     ), 200
 

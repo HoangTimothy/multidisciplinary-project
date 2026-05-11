@@ -6,6 +6,7 @@ Python server for receiving an ESP32-CAM MJPEG stream and running real-time obje
 - MJPEG stream ingest from ESP32-CAM local URL or ngrok URL
 - Real-time detection with EfficientDet Lite0 (MediaPipe)
 - Collision-risk-first alerts (distance, zone, box geometry, confidence, class as secondary)
+- Lightweight denoise/low-light preprocessing and temporal alert smoothing
 - Web dashboard with live stats and alerts
 - Smooth video path: capture/video streaming is decoupled from model inference
 - Vietnamese TTS alerts via Google TTS with browser speech fallback
@@ -88,6 +89,8 @@ MediaPipe models.
 
 Current laptop benchmark winner: EfficientDet Lite0 int8 with
 `SCORE_THRESHOLD = 0.35` and `MAX_RESULTS = 15`.
+The current production candidate also enables inference preprocessing and keeps
+short-lived alerts through brief detector misses for noisy/occluded streams.
 
 When the dashboard is running, collect stream metrics with:
 

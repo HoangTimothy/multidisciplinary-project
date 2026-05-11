@@ -39,6 +39,18 @@ GENERIC_RISK_MIN_CENTER_AREA_RATIO = 0.045
 GENERIC_RISK_LOWER_ZONE_MIN_Y = 0.35
 GENERIC_RISK_PRIORITY_THRESHOLD = 0.48
 
+# Temporal smoothing keeps the last high-risk alert alive briefly when a noisy,
+# shaky, or occluded frame causes a short detector miss.
+TEMPORAL_ALERT_SMOOTHING_ENABLED = True
+TEMPORAL_ALERT_HOLD_FRAMES = 2
+TEMPORAL_ALERT_HOLD_SECONDS = 0.8
+
+# Lightweight preprocessing for ESP32-like noisy/low-light frames. It preserves
+# frame size, so detector coordinates remain valid.
+INFERENCE_PREPROCESSING_ENABLED = True
+PREPROCESS_DENOISE_ENABLED = True
+PREPROCESS_LOW_LIGHT_ENABLED = True
+
 VI_LABELS = {
     "person": "người",
     "bicycle": "xe đạp",

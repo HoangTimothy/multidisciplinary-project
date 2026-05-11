@@ -15,6 +15,10 @@ object class names are secondary, and high-risk boxes may be alerted as
 runs should report `risk_alert_correctness` as the primary safety metric and
 `alert_correctness` as a stricter label/group diagnostic.
 
+The current alert-recall settings also enable lightweight denoise/low-light
+preprocessing and short temporal alert smoothing. On the 3,000-image synthetic
+robustness set, this raised `risk_alert_correctness` from 0.800 to 0.827.
+
 ## Winner policy
 
 - Require at least 200 benchmarked frames/images.

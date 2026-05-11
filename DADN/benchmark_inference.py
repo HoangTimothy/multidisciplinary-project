@@ -16,8 +16,10 @@ import cv2
 from decision_engine import DecisionEngine, ScoredObstacle
 from detector import DetectionItem, ObstacleDetector
 from experiment_config import ExperimentConfig, load_experiment_config
+from frame_preprocessing import preprocess_for_inference
 from model_registry import get_model_spec
 from model_utils import ensure_model
+from risk_smoothing import AlertSmoother
 
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
@@ -162,25 +164,52 @@ def benchmark_config(
         exp.runtime.frame_height,
         **asdict(exp.decision),
     )
+    smoother = AlertSmoother(
+        hold_frames=exp.alert.temporal_hold_frames,
+        hold_seconds=exp.alert.temporal_hold_seconds,
+    )
 
     rows: list[dict[str, Any]] = []
     latencies_ms: list[float] = []
     correctness_values: list[bool] = []
     risk_correctness_values: list[bool] = []
     matched_label_ids: set[str] = set()
+    frame_index = 0
+    last_source_key: Optional[str] = None
 
     for media_path in media_files(dataset):
         for item_id, frame in iter_frames(media_path, sample_every, max_frames_per_video):
+            frame_index += 1
             if frame.shape[1] != exp.runtime.frame_width or frame.shape[0] != exp.runtime.frame_height:
                 frame = cv2.resize(frame, (exp.runtime.frame_width, exp.runtime.frame_height))
 
             start = time.perf_counter()
-            detections: list[DetectionItem] = [] if dry_run or detector is None else detector.detect(frame)
+            inference_frame = frame
+            if exp.runtime.inference_preprocessing_enabled:
+                inference_frame = preprocess_for_inference(
+                    frame,
+                    denoise_enabled=exp.runtime.preprocess_denoise_enabled,
+                    low_light_enabled=exp.runtime.preprocess_low_light_enabled,
+                )
+            detections: list[DetectionItem] = [] if dry_run or detector is None else detector.detect(inference_frame)
             latency_ms = (time.perf_counter() - start) * 1000
-            alert = decision.choose_alert(detections)
+            raw_alert = decision.choose_alert(detections)
             expected, matched_label_id = expected_for(labels, item_id, media_path)
             if matched_label_id is not None:
                 matched_label_ids.add(matched_label_id)
+
+            source_key = str(expected.get("source_id") or media_path.name)
+            if source_key != last_source_key:
+                smoother.reset()
+                last_source_key = source_key
+            if exp.alert.temporal_smoothing_enabled:
+                alert = smoother.update(
+                    raw_alert,
+                    frame_index=frame_index,
+                    now_seconds=float(frame_index),
+                )
+            else:
+                alert = raw_alert
             eval_result = evaluate_alert(alert, expected)
 
             if expected:
@@ -195,6 +224,7 @@ def benchmark_config(
                     "item_id": item_id,
                     "latency_ms": f"{latency_ms:.3f}",
                     "detections_count": len(detections),
+                    "raw_alert_label": raw_alert.label if raw_alert else "",
                     "alert_label": alert.label if alert else "",
                     "alert_display_label": alert.label_vi if alert else "",
                     "alert_raw_label_vi": alert.raw_label_vi if alert else "",

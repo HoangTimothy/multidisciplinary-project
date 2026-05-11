@@ -11,7 +11,10 @@
     "frame_height": 480,
     "infer_every_n_frames": 5,
     "jpeg_quality": 60,
-    "inference_queue_size": 1
+    "inference_queue_size": 1,
+    "inference_preprocessing_enabled": true,
+    "preprocess_denoise_enabled": true,
+    "preprocess_low_light_enabled": true
   },
   "decision": {
     "near_area_ratio": 0.18,
@@ -31,6 +34,9 @@
   },
   "alert": {
     "speak_cooldown_seconds": 3.0,
-    "client_repeat_guard_seconds": 3.0
+    "client_repeat_guard_seconds": 3.0,
+    "temporal_smoothing_enabled": true,
+    "temporal_hold_frames": 2,
+    "temporal_hold_seconds": 0.8
   }
 }
