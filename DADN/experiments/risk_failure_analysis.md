@@ -179,3 +179,39 @@ ESP32 stream where short detector misses happen across adjacent frames. Noise
 improved the most (`0.774 -> 0.826`). Center occlusion remains weak
 (`0.770 -> 0.756`), so partial-object failure is still the strongest argument
 for a real-camera failure set and, if confirmed, fine-tuning or segmentation.
+
+## Hard-only benchmark: occlusion + motion blur
+
+The 3,000-image robustness set includes easier variants, so a hard-only set was
+created from just `center_occlusion` and `motion_blur`:
+
+- Hard set: `/mnt/d/datasets/dadn_public/robustness_hard_occlusion_motion_20260511`
+- Frames: 1,000 total, 500 per hard variant
+- Current candidate summary: `DADN/experiments/results/20260511-220254/summary.json`
+- Probe summary: `DADN/experiments/results/20260511-220458/summary.json`
+
+| Config | Risk correctness | Group correctness | Detection rate | p95 latency | Edge note |
+| --- | ---: | ---: | ---: | ---: | --- |
+| Current Lite0 recall | 0.807 | 0.686 | 0.897 | 34.7 ms | Current production candidate |
+| `hard_recall_lite0_int8` | 0.842 | 0.705 | 0.946 | 34.3 ms | Best Lite0 hard-case recall probe |
+| Lite2 int8 hard probe | 0.870 | 0.747 | 0.932 | 80.5 ms | Better, but much slower |
+
+Hard-case detail for `hard_recall_lite0_int8`:
+
+| Variant | Risk correctness | Group correctness | Detection rate | Alert rate |
+| --- | ---: | ---: | ---: | ---: |
+| `center_occlusion` | 0.806 | 0.658 | 0.926 | 0.806 |
+| `motion_blur` | 0.878 | 0.752 | 0.966 | 0.878 |
+
+Interpretation:
+
+- Removing easy samples makes the weakness visible: current Lite0 drops to
+  0.756 on occlusion and 0.858 on motion blur.
+- Aggressive Lite0 tuning improves both hard cases without a laptop latency
+  penalty, but this hard-only set is positive-only, so it cannot measure false
+  alert spam.
+- Lite2 int8 is the best accuracy probe, especially for occlusion, but its p95
+  latency is over 2x Lite0 on laptop, so it should not replace Lite0 for the
+  edge candidate unless Raspberry Pi tests show enough headroom.
+- If real ESP32 negative/non-obstacle frames show acceptable spam, promote
+  `hard_recall_lite0_int8`; otherwise keep it as a hard-case diagnostic config.
