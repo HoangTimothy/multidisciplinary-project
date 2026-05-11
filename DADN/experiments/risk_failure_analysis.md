@@ -262,3 +262,20 @@ by F1:
 This suggests ultrasonic/head-mounted sensor fusion could help DADN reduce
 missed visual alerts, but the precision is not high enough to replace camera
 risk scoring. It is better used as a secondary risk boost.
+
+GuideDog run attempt:
+
+- A Hugging Face token was provided and authenticated successfully.
+- The account still does not have dataset access for `kjunh/GuideDog`; the Hub
+  returned a gated dataset error asking to request access on the dataset page.
+- `prepare_external_subset.py` now passes `HF_TOKEN` explicitly to
+  `load_dataset`, so after the dataset terms are accepted in the browser, the
+  same command can prepare the image subset without code changes.
+
+HRBUST-LLPED run attempt:
+
+- Hugging Face search did not expose a directly downloadable HRBUST-LLPED repo.
+- The paper confirms 4,269 keyframes and 32,148 pedestrian instances, but a
+  stable public file URL/schema was not available from the search results.
+- Keep HRBUST as a low-light pedestrian benchmark candidate once the files are
+  obtained manually or from the authors.

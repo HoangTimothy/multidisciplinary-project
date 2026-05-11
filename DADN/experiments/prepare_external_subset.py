@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import urllib.request
 from pathlib import Path
@@ -113,7 +114,13 @@ def prepare_guidedog(args: argparse.Namespace) -> int:
     args.labels_out.parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        dataset = load_dataset("kjunh/GuideDog", args.config, split=args.split, streaming=True)
+        dataset = load_dataset(
+            "kjunh/GuideDog",
+            args.config,
+            split=args.split,
+            streaming=True,
+            token=os.getenv("HF_TOKEN"),
+        )
     except Exception as exc:
         raise SystemExit(
             "Could not load kjunh/GuideDog. The dataset is gated; log in with "
