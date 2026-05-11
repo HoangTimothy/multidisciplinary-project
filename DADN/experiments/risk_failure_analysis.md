@@ -215,3 +215,27 @@ Interpretation:
   edge candidate unless Raspberry Pi tests show enough headroom.
 - If real ESP32 negative/non-obstacle frames show acceptable spam, promote
   `hard_recall_lite0_int8`; otherwise keep it as a hard-case diagnostic config.
+
+## External dataset triage: 2026-05-11
+
+Three assistive/navigation-oriented datasets were checked for DADN integration:
+
+| Dataset | Status | Use in DADN |
+| --- | --- | --- |
+| Zenodo `10781048` wearable obstacle benchmark | Direct download works; MIT license; sensor CSV, not images | Use as collision-risk/time-series evidence, not MediaPipe image benchmark |
+| GuideDog | Hugging Face gated; access is auto-approved after accepting terms; image + bbox fields available in `object`/`depth` configs | Use for egocentric BLV street-view risk benchmark after HF login |
+| HRBUST-LLPED | Good low-light wearable pedestrian candidate; stable direct download/schema not wired yet | Use later for low-light pedestrian robustness when files are available |
+
+Implemented `DADN/experiments/prepare_external_subset.py`:
+
+- `zenodo-sensor` downloads/summarizes Zenodo sensor CSV into a DADN-style
+  risk manifest.
+- `guidedog` prepares GuideDog image subsets for `benchmark_inference.py` after
+  Hugging Face authentication and dataset terms acceptance.
+
+Smoke result for Zenodo Corridor:
+
+- Command prepared 500 rows from `Corridor_marked.csv`.
+- Label counts: 363 no-alert rows, 137 alert rows.
+- Output manifest:
+  `/mnt/d/datasets/dadn_external/zenodo_10781048/corridor_sensor_manifest.json`.

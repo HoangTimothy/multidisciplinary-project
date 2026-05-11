@@ -49,6 +49,41 @@ For real ESP32-CAM review frames, use
 `DADN/experiments/capture_real_camera_frames.py` and keep the raw frames outside
 Git.
 
+## External assistive datasets
+
+`prepare_external_subset.py` adds adapters for datasets closer to assistive
+navigation than generic COCO/BDD.
+
+Zenodo `10781048` is directly downloadable, but it is a sensor-only ultrasonic
+and IMU benchmark rather than camera frames. Use it as collision-risk evidence,
+not as input for `benchmark_inference.py`:
+
+```bash
+python DADN/experiments/prepare_external_subset.py zenodo-sensor \
+  --file Corridor_marked.csv \
+  --output-dir /data/dadn-external/zenodo_10781048 \
+  --labels-out /data/dadn-external/zenodo_10781048/corridor_sensor_manifest.json \
+  --max-rows 500
+```
+
+GuideDog is useful for egocentric BLV street-view evaluation. It is gated on
+Hugging Face, with auto-approved academic/non-commercial access. After accepting
+the terms and running `huggingface-cli login`, prepare an image subset:
+
+```bash
+python DADN/experiments/prepare_external_subset.py guidedog \
+  --config object \
+  --output-dir /data/dadn-external/guidedog_object/images \
+  --labels-out /data/dadn-external/guidedog_object/labels.json \
+  --max-items 200 \
+  --risk-only
+```
+
+HRBUST-LLPED is a good low-light wearable pedestrian candidate, but it is not
+yet wired into this repo because a stable direct download/schema was not found
+from the paper page. Add it through the same adapter style once the dataset
+files are available locally.
+
 ## Prepare a COCO + BDD subset
 
 BDD100K normally requires downloading the dataset through its official access
