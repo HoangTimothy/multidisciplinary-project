@@ -72,3 +72,43 @@ commit raw private frames; commit only the summarized failure analysis.
 Do not fine-tune just because the label is wrong. Fine-tuning becomes justified
 only if the robustness or real ESP32 frame set shows repeated missed obstacles
 after risk thresholds and camera quality have been tuned.
+
+## Synthetic robustness run: 2026-05-11
+
+Generated 3,000 robustness images from the 500-image public DADN subset:
+
+- Source: `/mnt/d/datasets/dadn_public/subset/images`
+- Labels: `/mnt/d/datasets/dadn_public/subset/labels_group.json`
+- Synthetic output: `/mnt/d/datasets/dadn_public/robustness_20260511-181506`
+- Benchmark summary: `DADN/experiments/results/20260511-181637/summary.json`
+
+Candidate tested: `tuned_lite0_int8_high_recall` using EfficientDet-Lite0 int8.
+
+| Variant | Frames | Risk correctness | Strict group correctness | Detection rate | Alert rate |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `center_occlusion` | 500 | 0.740 | 0.630 | 0.846 | 0.740 |
+| `esp32_resize` | 500 | 0.828 | 0.696 | 0.872 | 0.828 |
+| `jpeg_low_quality` | 500 | 0.832 | 0.722 | 0.884 | 0.832 |
+| `low_light` | 500 | 0.804 | 0.694 | 0.864 | 0.804 |
+| `motion_blur` | 500 | 0.830 | 0.712 | 0.896 | 0.830 |
+| `noise` | 500 | 0.766 | 0.658 | 0.846 | 0.766 |
+
+Overall:
+
+- `risk_alert_correctness`: 0.800
+- `alert_correctness`: 0.685
+- `detection_rate`: 0.868
+- `alert_rate`: 0.800
+- `false_alert_rate`: 0.000 on this positive-only robustness set
+- `p95_latency_ms`: 35.4 ms on laptop
+
+Interpretation:
+
+- The risk-first logic is useful: risk correctness is much higher than strict
+  group correctness, so alerting as `vật cản` is safer than trusting the class
+  name.
+- The weakest synthetic cases are center occlusion and noise, which matches the
+  real ESP32-CAM concerns: partial objects and noisy frames.
+- The main remaining failure type is missed detections, not just wrong labels.
+  Fine-tuning or segmentation becomes worth considering only if the same missed
+  obstacle pattern appears in the real ESP32 review set.
