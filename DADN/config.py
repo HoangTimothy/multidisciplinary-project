@@ -13,8 +13,8 @@ CAMERA_INDEX = 0
 FRAME_WIDTH = 640
 FRAME_HEIGHT = 480
 INFER_EVERY_N_FRAMES = 5
-SCORE_THRESHOLD = 0.4
-MAX_RESULTS = 10
+SCORE_THRESHOLD = 0.35
+MAX_RESULTS = 15
 
 # Relative distance estimation thresholds based on bounding box area ratio.
 # These are starting values and should be tuned with real camera tests.
@@ -34,10 +34,10 @@ ALERT_PRIORITY_THRESHOLD = 0.35
 # even when the COCO class name is wrong or not useful for navigation.
 GENERIC_OBSTACLE_LABEL_VI = "vật cản"
 GENERIC_RISK_ENABLED = True
-GENERIC_RISK_MIN_AREA_RATIO = 0.10
-GENERIC_RISK_MIN_CENTER_AREA_RATIO = 0.06
+GENERIC_RISK_MIN_AREA_RATIO = 0.08
+GENERIC_RISK_MIN_CENTER_AREA_RATIO = 0.045
 GENERIC_RISK_LOWER_ZONE_MIN_Y = 0.35
-GENERIC_RISK_PRIORITY_THRESHOLD = 0.55
+GENERIC_RISK_PRIORITY_THRESHOLD = 0.48
 
 VI_LABELS = {
     "person": "người",

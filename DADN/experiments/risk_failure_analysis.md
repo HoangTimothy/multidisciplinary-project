@@ -112,3 +112,36 @@ Interpretation:
 - The main remaining failure type is missed detections, not just wrong labels.
   Fine-tuning or segmentation becomes worth considering only if the same missed
   obstacle pattern appears in the real ESP32 review set.
+
+## Alert-recall tuning run: 2026-05-11
+
+Tuned the production candidate for higher alert recall:
+
+- `SCORE_THRESHOLD`: 0.40 -> 0.35
+- `MAX_RESULTS`: 10 -> 15
+- `GENERIC_RISK_MIN_AREA_RATIO`: 0.10 -> 0.08
+- `GENERIC_RISK_MIN_CENTER_AREA_RATIO`: 0.06 -> 0.045
+- `GENERIC_RISK_PRIORITY_THRESHOLD`: 0.55 -> 0.48
+
+Benchmark summary: `DADN/experiments/results/20260511-214131/summary.json`.
+
+| Variant | Risk correctness | Strict group correctness | Detection rate | Alert rate |
+| --- | ---: | ---: | ---: | ---: |
+| `center_occlusion` | 0.770 | 0.636 | 0.884 | 0.770 |
+| `esp32_resize` | 0.840 | 0.708 | 0.910 | 0.840 |
+| `jpeg_low_quality` | 0.850 | 0.726 | 0.910 | 0.850 |
+| `low_light` | 0.816 | 0.698 | 0.898 | 0.816 |
+| `motion_blur` | 0.848 | 0.726 | 0.926 | 0.848 |
+| `noise` | 0.774 | 0.660 | 0.878 | 0.774 |
+
+Overall after tuning:
+
+- `risk_alert_correctness`: 0.816, up from 0.800
+- `alert_correctness`: 0.692, up from 0.685
+- `detection_rate`: 0.901, up from 0.868
+- `alert_rate`: 0.816, up from 0.800
+- `p95_latency_ms`: 33.2 ms on laptop
+
+This tune is worth keeping for the laptop/edge candidate because it improves
+missed-alert robustness without increasing measured p95 latency on the synthetic
+set. The remaining weakest cases are still center occlusion and noise.

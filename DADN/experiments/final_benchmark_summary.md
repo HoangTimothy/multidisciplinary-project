@@ -4,7 +4,7 @@
 
 The laptop-first public benchmark now passes the evidence gate. The selected
 production candidate is `tuned_lite0_int8_high_recall`: EfficientDet-Lite0 int8
-with `score_threshold = 0.4` and `max_results = 10`.
+with `score_threshold = 0.35` and `max_results = 15`.
 
 This keeps the Raspberry Pi-friendly int8 model while improving group-level
 alert correctness on the COCO + BDD subset.

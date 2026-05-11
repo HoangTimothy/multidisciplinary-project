@@ -87,7 +87,7 @@ Use `--dry-run` to validate configs/dataset/output plumbing without loading
 MediaPipe models.
 
 Current laptop benchmark winner: EfficientDet Lite0 int8 with
-`SCORE_THRESHOLD = 0.4` and `MAX_RESULTS = 10`.
+`SCORE_THRESHOLD = 0.35` and `MAX_RESULTS = 15`.
 
 When the dashboard is running, collect stream metrics with:
 

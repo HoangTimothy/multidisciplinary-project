@@ -3,8 +3,8 @@
   "description": "EfficientDet-Lite0 int8 with aggressive threshold for recall comparison.",
   "detector": {
     "model_id": "efficientdet_lite0_int8",
-    "score_threshold": 0.4,
-    "max_results": 10
+    "score_threshold": 0.35,
+    "max_results": 15
   },
   "runtime": {
     "frame_width": 640,
