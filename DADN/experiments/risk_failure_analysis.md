@@ -239,3 +239,26 @@ Smoke result for Zenodo Corridor:
 - Label counts: 363 no-alert rows, 137 alert rows.
 - Output manifest:
   `/mnt/d/datasets/dadn_external/zenodo_10781048/corridor_sensor_manifest.json`.
+
+Full Zenodo sensor run:
+
+- Command prepared 188,565 rows from `Corridor_RoomL_Office_marked.csv`.
+- Label counts: 110,118 no-alert rows and 78,447 alert rows.
+- Scenarios: Office 119,323 rows, RoomL 59,008 rows, Corridor 10,234 rows.
+- Output manifest:
+  `/mnt/d/datasets/dadn_external/zenodo_10781048/all_marked_sensor_manifest.json`.
+- Distance baseline summary:
+  `/mnt/d/datasets/dadn_external/zenodo_10781048/sensor_baseline_summary.json`.
+
+A simple sensor-only rule, `max_ez1 <= 250 cm`, was the best tested threshold
+by F1:
+
+- accuracy: 0.653
+- precision: 0.563
+- recall: 0.744
+- F1: 0.641
+- alert rate: 0.550
+
+This suggests ultrasonic/head-mounted sensor fusion could help DADN reduce
+missed visual alerts, but the precision is not high enough to replace camera
+risk scoring. It is better used as a secondary risk boost.

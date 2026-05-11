@@ -203,11 +203,12 @@ def prepare_zenodo_sensor(args: argparse.Namespace) -> int:
     df = pd.read_csv(csv_path)
     if args.max_rows:
         df = df.head(args.max_rows)
+    distance_col = "distance" if "distance" in df.columns else "max_ez1"
 
     rows = []
     for idx, row in df.iterrows():
         expected_alert = bool(int(row.get("label", 0)))
-        distance_cm = float(row.get("distance", 500))
+        distance_cm = float(row.get(distance_col, 500))
         if distance_cm <= 120:
             expected_distance = "gần"
         elif distance_cm <= 300:
@@ -232,6 +233,7 @@ def prepare_zenodo_sensor(args: argparse.Namespace) -> int:
         "source": "zenodo:10781048",
         "note": "Sensor-only ultrasonic/IMU benchmark; not image input for benchmark_inference.py.",
         "csv": str(csv_path),
+        "distance_column": distance_col,
         "rows": len(rows),
         "label_counts": {str(key): int(value) for key, value in label_counts.items()},
         "items": rows,
