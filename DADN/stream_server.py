@@ -242,9 +242,13 @@ def inference_worker():
             if alert:
                 inference_stats["last_alert"] = {
                     "label": alert.label_vi,
+                    "raw_label": alert.raw_label_vi,
                     "distance": alert.distance_level,
                     "zone": alert.horizontal_zone,
                     "priority": float(alert.priority),
+                    "semantic_priority": float(alert.semantic_priority),
+                    "collision_risk_priority": float(alert.collision_risk_priority),
+                    "alert_kind": alert.alert_kind,
                     "spoken_text": alert.spoken_text,
                     "latency_ms": alert_latency_ms,
                     "timestamp": time.time(),

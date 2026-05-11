@@ -6,7 +6,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from decision_engine import DecisionEngine
 from detector import DetectionItem
 from config import ALERT_PRIORITY_THRESHOLD, CLASS_WEIGHTS, VI_LABELS
-from benchmark_inference import choose_winner
+from benchmark_inference import choose_winner, evaluate_alert
 from experiment_config import load_experiment_config
 from model_registry import get_model_spec
 
@@ -58,6 +58,37 @@ def test_alert_priority_threshold_suppresses_weak_generic_alerts():
     assert strong_alert.label == "book"
 
 
+def test_generic_collision_risk_uses_obstacle_label_for_ambiguous_class():
+    engine = DecisionEngine(640, 480, alert_priority_threshold=ALERT_PRIORITY_THRESHOLD)
+
+    alert = engine.choose_alert([DetectionItem("tennis racket", 0.76, 80, 250, 360, 220)])
+
+    assert alert is not None
+    assert alert.label == "tennis racket"
+    assert alert.raw_label_vi == "vợt tennis"
+    assert alert.label_vi == "vật cản"
+    assert alert.alert_kind == "generic_risk"
+    assert alert.collision_risk_priority >= alert.semantic_priority
+
+
+def test_generic_collision_risk_does_not_alert_small_far_objects():
+    engine = DecisionEngine(640, 480, alert_priority_threshold=ALERT_PRIORITY_THRESHOLD)
+
+    alert = engine.choose_alert([DetectionItem("tennis racket", 0.8, 20, 20, 60, 50)])
+
+    assert alert is None
+
+
+def test_risk_correctness_ignores_wrong_group_when_alert_is_present():
+    engine = DecisionEngine(640, 480, alert_priority_threshold=ALERT_PRIORITY_THRESHOLD)
+    alert = engine.choose_alert([DetectionItem("tennis racket", 0.76, 80, 250, 360, 220)])
+
+    result = evaluate_alert(alert, {"expected_alert": True, "expected_group": "static_obstacle"})
+
+    assert result["risk_correct"] is True
+    assert result["correct"] is False
+
+
 def test_benchmark_winner_prefers_latency_when_scores_are_close():
     summaries = [
         {
@@ -66,6 +97,7 @@ def test_benchmark_winner_prefers_latency_when_scores_are_close():
             "frames": 250,
             "labeled_frames": 250,
             "alert_correctness": 0.85,
+            "risk_alert_correctness": 0.85,
             "balanced_score": 0.82,
             "p95_latency_ms": 130.0,
         },
@@ -75,6 +107,7 @@ def test_benchmark_winner_prefers_latency_when_scores_are_close():
             "frames": 250,
             "labeled_frames": 250,
             "alert_correctness": 0.82,
+            "risk_alert_correctness": 0.82,
             "balanced_score": 0.80,
             "p95_latency_ms": 60.0,
         },

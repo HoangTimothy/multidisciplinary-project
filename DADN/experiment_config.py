@@ -12,6 +12,13 @@ from config import (
     CLASS_WEIGHTS,
     FRAME_HEIGHT,
     FRAME_WIDTH,
+    GENERIC_OBSTACLE_LABEL_VI,
+    GENERIC_RISK_ENABLED,
+    GENERIC_RISK_LOWER_ZONE_MIN_Y,
+    GENERIC_RISK_MIN_AREA_RATIO,
+    GENERIC_RISK_MIN_CENTER_AREA_RATIO,
+    GENERIC_RISK_PRESERVE_LABELS,
+    GENERIC_RISK_PRIORITY_THRESHOLD,
     INFER_EVERY_N_FRAMES,
     LOWER_ZONE_MIN_Y,
     MAX_RESULTS,
@@ -54,6 +61,13 @@ class DecisionParams:
     center_direction_weight: float = 1.0
     side_direction_weight: float = 0.92
     alert_priority_threshold: float = ALERT_PRIORITY_THRESHOLD
+    generic_risk_enabled: bool = GENERIC_RISK_ENABLED
+    generic_obstacle_label_vi: str = GENERIC_OBSTACLE_LABEL_VI
+    generic_risk_min_area_ratio: float = GENERIC_RISK_MIN_AREA_RATIO
+    generic_risk_min_center_area_ratio: float = GENERIC_RISK_MIN_CENTER_AREA_RATIO
+    generic_risk_lower_zone_min_y: float = GENERIC_RISK_LOWER_ZONE_MIN_Y
+    generic_risk_priority_threshold: float = GENERIC_RISK_PRIORITY_THRESHOLD
+    generic_risk_preserve_labels: list[str] = field(default_factory=lambda: sorted(GENERIC_RISK_PRESERVE_LABELS))
 
 
 @dataclass(frozen=True)

@@ -9,6 +9,12 @@ with `score_threshold = 0.4` and `max_results = 10`.
 This keeps the Raspberry Pi-friendly int8 model while improving group-level
 alert correctness on the COCO + BDD subset.
 
+After real-camera debugging, DADN now treats this as a collision-risk candidate:
+object class names are secondary, and high-risk boxes may be alerted as
+`vật cản` when the COCO label is not useful for navigation. Future benchmark
+runs should report `risk_alert_correctness` as the primary safety metric and
+`alert_correctness` as a stricter label/group diagnostic.
+
 ## Winner policy
 
 - Require at least 200 benchmarked frames/images.

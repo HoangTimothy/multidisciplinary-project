@@ -26,6 +26,29 @@ The open datasets are useful for model sanity. For a production handoff, keep
 the raw COCO/BDD images outside Git, generate a small labeled subset locally,
 and commit only the final benchmark summary.
 
+## Collision-risk robustness subset
+
+For DADN, the main production question is whether a risky obstacle triggers an
+alert, not whether the object name is perfect. Build a synthetic robustness set
+from the labeled public subset to stress ESP32-like conditions:
+
+```bash
+python DADN/experiments/prepare_robustness_subset.py \
+  --input /data/dadn-public-subset/images \
+  --labels /data/dadn-public-subset/labels.json \
+  --output /data/dadn-robustness/images \
+  --labels-out /data/dadn-robustness/labels.json \
+  --max-images 50
+```
+
+This generates motion blur, noise, low-light, JPEG-compressed, center-occluded,
+and ESP32-resized variants. Use `risk_alert_correctness` as the primary metric;
+`alert_correctness` remains the stricter group/zone/distance diagnostic.
+
+For real ESP32-CAM review frames, use
+`DADN/experiments/capture_real_camera_frames.py` and keep the raw frames outside
+Git.
+
 ## Prepare a COCO + BDD subset
 
 BDD100K normally requires downloading the dataset through its official access
@@ -99,10 +122,11 @@ python DADN/benchmark_inference.py \
 
 Generated results are written to `DADN/experiments/results/<timestamp>/`.
 The winner rule keeps only configs with enough labeled evidence and
-`alert_correctness >= 0.75`; if scores are within `0.03`, the lower p95 latency
-candidate wins. If no config passes, keep `efficientdet_lite0_int8`.
+risk/alert correctness >= `0.75`; if scores are within `0.03`, the lower p95
+latency candidate wins. If no config passes, keep `efficientdet_lite0_int8`.
 
-See `final_benchmark_summary.md` for the current repo conclusion.
+See `final_benchmark_summary.md` for the current repo conclusion and
+`risk_failure_analysis.md` for the collision-risk failure-analysis workflow.
 
 ## Raspberry Pi handoff
 

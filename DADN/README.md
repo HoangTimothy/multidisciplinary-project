@@ -5,7 +5,7 @@ Python server for receiving an ESP32-CAM MJPEG stream and running real-time obje
 ## Features
 - MJPEG stream ingest from ESP32-CAM local URL or ngrok URL
 - Real-time detection with EfficientDet Lite0 (MediaPipe)
-- Obstacle prioritization (distance, zone, class weight)
+- Collision-risk-first alerts (distance, zone, box geometry, confidence, class as secondary)
 - Web dashboard with live stats and alerts
 - Smooth video path: capture/video streaming is decoupled from model inference
 - Vietnamese TTS alerts via Google TTS with browser speech fallback
@@ -66,8 +66,8 @@ python benchmark_inference.py \
 ```
 
 Labels are required for a defensible model choice. Without matching labels,
-the runner reports `alert_correctness: null`, marks every config ineligible,
-and falls back to the current default model.
+the runner reports `alert_correctness: null` and `risk_alert_correctness: null`,
+marks every config ineligible, and falls back to the current default model.
 
 ```bash
 python experiments/prepare_public_subset.py \
@@ -82,6 +82,7 @@ python experiments/prepare_public_subset.py \
 Outputs are written to `experiments/results/<timestamp>/` and ignored by Git.
 See `experiments/README.md` for dataset guidance and
 `experiments/final_benchmark_summary.md` for the current repo conclusion.
+For robustness/failure analysis, see `experiments/risk_failure_analysis.md`.
 Use `--dry-run` to validate configs/dataset/output plumbing without loading
 MediaPipe models.
 

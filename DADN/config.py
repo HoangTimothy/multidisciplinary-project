@@ -30,6 +30,15 @@ SPEAK_COOLDOWN_SECONDS = 3.0
 REPEAT_IF_RISK_UPGRADED_SECONDS = 1.0
 ALERT_PRIORITY_THRESHOLD = 0.35
 
+# Collision-risk fallback. This keeps the system focused on "will I hit this?"
+# even when the COCO class name is wrong or not useful for navigation.
+GENERIC_OBSTACLE_LABEL_VI = "vật cản"
+GENERIC_RISK_ENABLED = True
+GENERIC_RISK_MIN_AREA_RATIO = 0.10
+GENERIC_RISK_MIN_CENTER_AREA_RATIO = 0.06
+GENERIC_RISK_LOWER_ZONE_MIN_Y = 0.35
+GENERIC_RISK_PRIORITY_THRESHOLD = 0.55
+
 VI_LABELS = {
     "person": "người",
     "bicycle": "xe đạp",
@@ -132,3 +141,26 @@ MOBILITY_CLASS_WEIGHTS = {
 }
 CLASS_WEIGHTS = {label: DEFAULT_CLASS_WEIGHT for label in VI_LABELS}
 CLASS_WEIGHTS.update(MOBILITY_CLASS_WEIGHTS)
+
+# Labels that are useful enough to speak directly when they are high-risk.
+# Other COCO labels can still trigger an alert, but are spoken as "vật cản"
+# to avoid misleading names such as "tennis racket" for partial furniture/fans.
+GENERIC_RISK_PRESERVE_LABELS = {
+    "person",
+    "bicycle",
+    "motorcycle",
+    "car",
+    "bus",
+    "truck",
+    "chair",
+    "bench",
+    "backpack",
+    "suitcase",
+    "couch",
+    "bed",
+    "dining table",
+    "potted plant",
+    "tv",
+    "laptop",
+    "refrigerator",
+}

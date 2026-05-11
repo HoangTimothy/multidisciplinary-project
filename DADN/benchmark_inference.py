@@ -112,6 +112,7 @@ def evaluate_alert(alert: Optional[ScoredObstacle], expected: dict[str, Any]) ->
     zone_ok = expected_zone is None or (alert is not None and alert.horizontal_zone == expected_zone)
     distance_ok = expected_distance is None or (alert is not None and alert.distance_level == expected_distance)
     alert_ok = has_alert == expected_alert
+    risk_correct = alert_ok
     correct = alert_ok and group_ok and zone_ok and distance_ok
 
     return {
@@ -124,6 +125,7 @@ def evaluate_alert(alert: Optional[ScoredObstacle], expected: dict[str, Any]) ->
         "zone_ok": zone_ok,
         "distance_ok": distance_ok,
         "alert_ok": alert_ok,
+        "risk_correct": risk_correct,
         "correct": correct,
     }
 
@@ -164,6 +166,7 @@ def benchmark_config(
     rows: list[dict[str, Any]] = []
     latencies_ms: list[float] = []
     correctness_values: list[bool] = []
+    risk_correctness_values: list[bool] = []
     matched_label_ids: set[str] = set()
 
     for media_path in media_files(dataset):
@@ -182,6 +185,7 @@ def benchmark_config(
 
             if expected:
                 correctness_values.append(bool(eval_result["correct"]))
+                risk_correctness_values.append(bool(eval_result["risk_correct"]))
             latencies_ms.append(latency_ms)
 
             rows.append(
@@ -192,13 +196,20 @@ def benchmark_config(
                     "latency_ms": f"{latency_ms:.3f}",
                     "detections_count": len(detections),
                     "alert_label": alert.label if alert else "",
+                    "alert_display_label": alert.label_vi if alert else "",
+                    "alert_raw_label_vi": alert.raw_label_vi if alert else "",
+                    "alert_kind": alert.alert_kind if alert else "",
                     "alert_group": eval_result["alert_group"] or "",
                     "alert_zone": alert.horizontal_zone if alert else "",
                     "alert_distance": alert.distance_level if alert else "",
                     "alert_priority": f"{alert.priority:.6f}" if alert else "",
+                    "alert_semantic_priority": f"{alert.semantic_priority:.6f}" if alert else "",
+                    "alert_collision_risk_priority": f"{alert.collision_risk_priority:.6f}" if alert else "",
+                    "expected_alert": eval_result["expected_alert"] if expected else "",
                     "expected_group": eval_result["expected_group"] or "",
                     "expected_zone": eval_result["expected_zone"] or "",
                     "expected_distance": eval_result["expected_distance"] or "",
+                    "risk_correct": eval_result["risk_correct"] if expected else "",
                     "correct": eval_result["correct"] if expected else "",
                 }
             )
@@ -213,14 +224,21 @@ def benchmark_config(
     avg_latency = statistics.fmean(latencies_ms) if latencies_ms else 0.0
     p95_latency = p95(latencies_ms)
     correctness = statistics.fmean(correctness_values) if correctness_values else None
+    risk_correctness = statistics.fmean(risk_correctness_values) if risk_correctness_values else None
     labeled_frames = len(correctness_values)
     label_coverage = labeled_frames / len(rows) if rows else 0.0
     unmatched_labels_count = max(0, len(labels) - len(matched_label_ids))
     latency_score = max(0.0, 1.0 - min(p95_latency, 250.0) / 250.0)
     detection_rate = statistics.fmean([1.0 if int(row["detections_count"]) > 0 else 0.0 for row in rows]) if rows else 0.0
     alert_rate = statistics.fmean([1.0 if row["alert_label"] else 0.0 for row in rows]) if rows else 0.0
-    correctness_score = correctness if correctness is not None else detection_rate
-    correctness_for_false_alert = correctness if correctness is not None else 0.0
+    correctness_score = (
+        risk_correctness
+        if risk_correctness is not None
+        else correctness
+        if correctness is not None
+        else detection_rate
+    )
+    correctness_for_false_alert = risk_correctness if risk_correctness is not None else 0.0
     false_alert_score = 1.0 - max(0.0, alert_rate - correctness_for_false_alert)
     balanced_score = (
         0.40 * correctness_score
@@ -242,6 +260,8 @@ def benchmark_config(
         "detection_rate": detection_rate,
         "alert_rate": alert_rate,
         "alert_correctness": correctness,
+        "risk_alert_correctness": risk_correctness,
+        "false_alert_rate": max(0.0, alert_rate - correctness_for_false_alert),
         "labeled_frames": labeled_frames,
         "label_coverage": label_coverage,
         "unmatched_labels": unmatched_labels_count,
@@ -261,12 +281,16 @@ def choose_winner(
     min_labeled_frames: int,
 ) -> dict[str, Any]:
     for item in summaries:
+        gate_correctness = item.get("risk_alert_correctness")
+        if gate_correctness is None:
+            gate_correctness = item.get("alert_correctness")
         item["meets_min_frames"] = item["frames"] >= min_frames
         item["meets_min_labeled_frames"] = item["labeled_frames"] >= min_labeled_frames
         item["meets_alert_correctness"] = (
-            item["alert_correctness"] is not None
-            and item["alert_correctness"] >= min_alert_correctness
+            gate_correctness is not None
+            and gate_correctness >= min_alert_correctness
         )
+        item["winner_gate_correctness"] = gate_correctness
         item["winner_eligible"] = (
             item["meets_min_frames"]
             and item["meets_min_labeled_frames"]
@@ -288,7 +312,7 @@ def choose_winner(
             "selected": True,
             "fallback": False,
             "reason": (
-                f"Eligible configs met alert_correctness >= {min_alert_correctness:.2f}; "
+                f"Eligible configs met risk/alert correctness >= {min_alert_correctness:.2f}; "
                 f"selected lowest p95 latency among configs within {close_score_delta:.2f} "
                 "balanced_score of the best score."
             ),
@@ -409,7 +433,9 @@ def main() -> int:
             f"{label} "
             f"{best['experiment_id']} score={best['balanced_score']:.3f} "
             f"p95={best['p95_latency_ms']:.1f}ms frames={best['frames']} "
-            f"labeled={best['labeled_frames']} correctness={best['alert_correctness']}"
+            f"labeled={best['labeled_frames']} "
+            f"risk_correctness={best.get('risk_alert_correctness')} "
+            f"group_correctness={best['alert_correctness']}"
         )
         if winner["fallback"]:
             print(f"[FALLBACK] {winner['reason']}")
