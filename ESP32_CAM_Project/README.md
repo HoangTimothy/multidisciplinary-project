@@ -8,6 +8,30 @@ PlatformIO firmware project for AI Thinker ESP32-CAM.
 - Periodic health ping to Python server
 - ngrok helper for sending the ESP32-CAM stream to remote DADN inference
 
+## Prerequisites
+
+Install these before flashing the ESP32-CAM or trying to auto-detect ports:
+
+- Python 3.x (for helper scripts like `configure_esp32_wifi.py`, `run_esp32_all.py`).
+- PlatformIO (choose one):
+  - VS Code extension: **PlatformIO IDE**, or
+  - CLI: `python -m pip install platformio`
+- USB-UART driver for your adapter (common: CH340 / CP210x). Without the driver, the COM port will not appear.
+- Optional (recommended for auto COM-port detection / Serial fallback in `run_esp32_all.py`):
+  - `python -m pip install pyserial`
+
+Quick ways to find your COM port on Windows:
+
+```powershell
+python -m platformio device list
+```
+
+Or (requires `pyserial`):
+
+```powershell
+python -m serial.tools.list_ports
+```
+
 ## Configuration
 Create a local credentials file. It is ignored by Git so the WiFi password is
 not committed:
@@ -19,14 +43,14 @@ python configure_esp32_wifi.py --ssid "YOUR_2G_WIFI" --password "YOUR_WIFI_PASSW
 On Windows with the current CH340 adapter:
 
 ```powershell
-D:\DADN\venv\Scripts\python.exe configure_esp32_wifi.py --ssid "YOUR_2G_WIFI" --password "YOUR_WIFI_PASSWORD" --upload --upload-port COM13
+D:\DADN\venv\Scripts\python.exe configure_esp32_wifi.py --ssid "YOUR_2G_WIFI" --password "YOUR_WIFI_PASSWORD" --upload --upload-port <COM_PORT>
 ```
 
 If the image is upside down or mirrored, set orientation during the same step:
 
 ```powershell
-D:\DADN\venv\Scripts\python.exe configure_esp32_wifi.py --ssid "YOUR_2G_WIFI" --password "YOUR_WIFI_PASSWORD" --vflip --upload --upload-port COM13
-D:\DADN\venv\Scripts\python.exe configure_esp32_wifi.py --ssid "YOUR_2G_WIFI" --password "YOUR_WIFI_PASSWORD" --hmirror --upload --upload-port COM13
+D:\DADN\venv\Scripts\python.exe configure_esp32_wifi.py --ssid "YOUR_2G_WIFI" --password "YOUR_WIFI_PASSWORD" --vflip --upload --upload-port <COM_PORT>
+D:\DADN\venv\Scripts\python.exe configure_esp32_wifi.py --ssid "YOUR_2G_WIFI" --password "YOUR_WIFI_PASSWORD" --hmirror --upload --upload-port <COM_PORT>
 ```
 
 This writes `include/wifi_credentials.h`, then optionally uploads the firmware.
@@ -54,12 +78,21 @@ upload_port = COM7
 monitor_port = COM7
 ```
 
-### Windows/COM13 local setup
+### Windows (ví dụ COM13) local setup
 
 On one Windows machine, the ESP32-CAM USB-UART adapter appeared as:
 
 ```text
 USB-SERIAL CH340 (COM13)
+```
+
+COM port **không cố định** (có thể là `COM3`, `COM7`, `COM13`, ...). Hãy tự kiểm tra trên máy bạn bằng một trong các cách:
+
+- Device Manager → Ports (COM & LPT)
+- Hoặc bằng PlatformIO:
+
+```powershell
+python -m platformio device list
 ```
 
 `platformio` was not available directly in `PATH`, so PlatformIO was installed
@@ -69,10 +102,11 @@ into the existing Windows Python virtual environment:
 D:\DADN\venv\Scripts\python.exe -m pip install platformio
 ```
 
-Keep `platformio.ini` generic for Git. If your adapter appears as `COM13`, set
-the ports locally before uploading:
+Keep `platformio.ini` generic for Git. If your adapter appears as `COMxx`, set
+the ports locally before uploading (example below):
 
 ```ini
+; Example only — replace COM13 with your actual COM port
 upload_port = COM13
 monitor_port = COM13
 ```
@@ -88,7 +122,7 @@ D:\DADN\venv\Scripts\python.exe -m platformio run --target upload
 Read Serial Monitor manually from PowerShell if needed:
 
 ```powershell
-$p = New-Object System.IO.Ports.SerialPort "COM13",115200,"None",8,"One"
+$p = New-Object System.IO.Ports.SerialPort "<COM_PORT>",115200,"None",8,"One"
 $p.ReadTimeout = 1000
 $p.DtrEnable = $false
 $p.RtsEnable = $false
@@ -161,8 +195,8 @@ Or let the launcher find the ESP32-CAM automatically, even if DHCP changes its I
 python auto_camera_ngrok.py
 ```
 
-One-command setup is available if `ngrok` is not installed yet. It downloads the
-ngrok agent into the ignored repo-local `.tools/` folder, configures the token
+One-command setup is available if `ngrok` is not installed yet on Linux/WSL/Raspberry Pi.
+It downloads the ngrok agent into the ignored repo-local `.tools/` folder, configures the token
 from `NGROK_AUTHTOKEN`, scans for the ESP32-CAM, starts ngrok, and prints the
 public `/stream` URL:
 
@@ -180,13 +214,21 @@ python run_esp32_all.py
 python run_esp32_all.py --ngrok-token "<YOUR_NGROK_TOKEN>"
 ```
 
+On native Windows, install `ngrok` manually and ensure it is available in `PATH` before running the helper.
+
+If you want the helper to auto-detect COM ports / read ESP32 Serial output on Windows, install `pyserial` first:
+
+```powershell
+python -m pip install pyserial
+```
+
 If LAN scan cannot find the ESP32-CAM, the wrapper automatically falls back to
 reading the ESP32 Serial Monitor, parses `Stream URL:
 http://<ip>:8081/stream`, validates the stream, and exposes that URL. To force a
 specific adapter:
 
 ```bash
-python run_esp32_all.py --ngrok-token <YOUR_NGROK_TOKEN> --serial-port COM13
+python run_esp32_all.py --ngrok-token <YOUR_NGROK_TOKEN> --serial-port <COM_PORT>
 ```
 
 The wrapper scans common ESP32-CAM stream ports automatically: `8081`, `80`,

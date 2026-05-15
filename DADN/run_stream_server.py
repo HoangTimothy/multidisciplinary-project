@@ -64,16 +64,16 @@ def main():
         description="Start ESP32-CAM streaming and detection server"
     )
     parser.add_argument(
-        "--esp32-url",
+        "--camera-url",
         type=str,
         default=None,
         help="Camera MJPEG stream URL or ngrok base URL (e.g., https://xxxx.ngrok-free.app)"
     )
     parser.add_argument(
-        "--camera-url",
+        "--esp32-url",
         type=str,
-        default=None,
-        help="Alias for --esp32-url. Use this when the camera is a webcam/local camera bridge."
+        dest="camera_url",
+        help="Alias for --camera-url"
     )
     parser.add_argument(
         "--esp32-url-file",
@@ -123,52 +123,44 @@ def main():
 
     # Get camera stream URL. ESP32_* names are kept for compatibility.
     url_file = args.camera_url_file or args.esp32_url_file
-    esp32_url = (
+    camera_url = (
         args.camera_url
-        or args.esp32_url
         or os.getenv("CAMERA_STREAM_URL")
         or os.getenv("CAMERA_NGROK_URL")
-        or os.getenv("ESP32_STREAM_URL")
-        or os.getenv("ESP32_NGROK_URL")
     )
-    if not esp32_url:
-        esp32_url = read_url_file(url_file)
+    if not camera_url:
+        camera_url = read_url_file(url_file)
 
-    if not esp32_url:
+    if not camera_url:
         print("⚙️  Camera Configuration")
-        print("   Enter your camera stream URL")
-        print("   Example local: http://192.168.1.50:8081/stream")
-        print("   Example ngrok: https://xxxx.ngrok-free.app")
-        print("   Or press Enter to use default test URL")
-        esp32_url = input("   URL: ").strip()
-        if not esp32_url:
-            local_ip = get_local_ip()
-            esp32_url = f"http://192.168.1.50:8081/stream"
-            print(f"   ℹ️  Using default: {esp32_url}")
+        camera_url = input("   Enter camera URL (default: http://192.168.1.50:8081/stream): ").strip()
+        if not camera_url:
+            camera_url = "http://192.168.1.50:8081/stream"
 
     try:
-        esp32_url = normalize_stream_url(esp32_url)
+        camera_url = normalize_stream_url(camera_url)
     except ValueError as e:
         print(f"   ❌ Invalid camera URL: {e}")
         sys.exit(1)
 
+    local_ip = get_local_ip()
     print(f"\n📡 Configuration:")
     print(f"   Server: http://0.0.0.0:{args.port}")
-    print(f"   Camera Stream: {esp32_url}")
-    print(f"   Local IP: http://{get_local_ip()}:{args.port}")
+    print(f"   Camera Stream: {camera_url}")
+    print(f"   Local IP: http://{local_ip}:{args.port}")
     print()
 
     # Import and run server
     print("🔄 Initializing models...")
     try:
-        from stream_server import app, init_models, capture_stream, inference_worker
+        from server.stream_server import app, init_models, capture_stream, inference_worker
         import threading
         
         init_models()
         print("✅ Models loaded successfully\n")
         
         # Configure app
-        app.config["ESP32_STREAM_URL"] = esp32_url
+        app.config["ESP32_STREAM_URL"] = camera_url
         
         # Start capture thread
         capture_thread = threading.Thread(target=capture_stream, daemon=True)
@@ -186,17 +178,8 @@ def main():
         print(f"\n📱 Access web interface:")
         print(f"   http://localhost:{args.port}")
         print(f"   http://{get_local_ip()}:{args.port}")
-        print(f"\n📊 API endpoints:")
-        print(f"   Health: http://localhost:{args.port}/health")
-        print(f"   Stats: http://localhost:{args.port}/api/stats")
-        print(f"   Config: http://localhost:{args.port}/api/config")
-        print(f"\n📹 Camera Stream:")
-        print(f"   {esp32_url}")
-        print(f"\n💡 Tips:")
-        print(f"   - Open the web URL in your browser")
-        print(f"   - Position objects in front of camera")
-        print(f"   - Look for red boxes around detected obstacles")
-        print(f"   - Press Ctrl+C to stop server")
+        print(f"\n📹 Camera Stream: {camera_url}")
+        print(f"💡 Press Ctrl+C to stop server")
         print("\n" + "="*60 + "\n")
         
         # Open browser if not disabled

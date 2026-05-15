@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from config import (
+from core.config import (
     ALERT_PRIORITY_THRESHOLD,
     CENTER_ZONE_MAX_X,
     CENTER_ZONE_MIN_X,

@@ -12,11 +12,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from model_registry import get_model_spec
-from model_utils import ensure_model
+from core.model_registry import get_model_spec
+from core.model_utils import ensure_model
 
 
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent.parent
 RESULTS_DIR = BASE_DIR / "experiments" / "results"
 EDGE_CONFIGS = [
     BASE_DIR / "experiments" / "configs" / "tuned_lite0_int8_high_recall.json",

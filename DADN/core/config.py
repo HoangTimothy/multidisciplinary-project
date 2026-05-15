@@ -1,6 +1,6 @@
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent.parent
 MODEL_DIR = BASE_DIR / "models"
 MODEL_ID = "efficientdet_lite0_int8"
 MODEL_PATH = MODEL_DIR / "efficientdet_lite0_int8.tflite"
@@ -16,12 +16,11 @@ INFER_EVERY_N_FRAMES = 5
 SCORE_THRESHOLD = 0.35
 MAX_RESULTS = 15
 
-# Relative distance estimation thresholds based on bounding box area ratio.
-# These are starting values and should be tuned with real camera tests.
+# Distance estimation thresholds
 NEAR_AREA_RATIO = 0.18
 MEDIUM_AREA_RATIO = 0.06
 
-# Center danger zone: objects here are more relevant to the user's path.
+# Spatial zones
 CENTER_ZONE_MIN_X = 0.25
 CENTER_ZONE_MAX_X = 0.75
 LOWER_ZONE_MIN_Y = 0.40
@@ -30,8 +29,7 @@ SPEAK_COOLDOWN_SECONDS = 3.0
 REPEAT_IF_RISK_UPGRADED_SECONDS = 1.0
 ALERT_PRIORITY_THRESHOLD = 0.35
 
-# Collision-risk fallback. This keeps the system focused on "will I hit this?"
-# even when the COCO class name is wrong or not useful for navigation.
+# Collision-risk logic
 GENERIC_OBSTACLE_LABEL_VI = "vật cản"
 GENERIC_RISK_ENABLED = True
 GENERIC_RISK_MIN_AREA_RATIO = 0.08
@@ -39,14 +37,12 @@ GENERIC_RISK_MIN_CENTER_AREA_RATIO = 0.045
 GENERIC_RISK_LOWER_ZONE_MIN_Y = 0.35
 GENERIC_RISK_PRIORITY_THRESHOLD = 0.48
 
-# Temporal smoothing keeps the last high-risk alert alive briefly when a noisy,
-# shaky, or occluded frame causes a short detector miss.
+# Temporal smoothing
 TEMPORAL_ALERT_SMOOTHING_ENABLED = True
 TEMPORAL_ALERT_HOLD_FRAMES = 2
 TEMPORAL_ALERT_HOLD_SECONDS = 0.8
 
-# Lightweight preprocessing for ESP32-like noisy/low-light frames. It preserves
-# frame size, so detector coordinates remain valid.
+# Image preprocessing
 INFERENCE_PREPROCESSING_ENABLED = True
 PREPROCESS_DENOISE_ENABLED = True
 PREPROCESS_LOW_LIGHT_ENABLED = True
@@ -134,9 +130,7 @@ VI_LABELS = {
     "toothbrush": "bàn chải đánh răng",
 }
 
-# The detector is COCO-style, so keep all known COCO labels eligible for alert
-# scoring. Mobility-relevant objects get higher weights; everything else needs
-# stronger confidence/nearer geometry to pass ALERT_PRIORITY_THRESHOLD.
+# Class weights for alert priority calculation
 DEFAULT_CLASS_WEIGHT = 0.55
 MOBILITY_CLASS_WEIGHTS = {
     "person": 1.00,
@@ -154,9 +148,7 @@ MOBILITY_CLASS_WEIGHTS = {
 CLASS_WEIGHTS = {label: DEFAULT_CLASS_WEIGHT for label in VI_LABELS}
 CLASS_WEIGHTS.update(MOBILITY_CLASS_WEIGHTS)
 
-# Labels that are useful enough to speak directly when they are high-risk.
-# Other COCO labels can still trigger an alert, but are spoken as "vật cản"
-# to avoid misleading names such as "tennis racket" for partial furniture/fans.
+# High-confidence labels to preserve in TTS output
 GENERIC_RISK_PRESERVE_LABELS = {
     "person",
     "bicycle",

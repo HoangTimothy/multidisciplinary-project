@@ -1,3 +1,35 @@
-*.zip
-.pytest_cache/
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.venv/
+venv/
+ENV/
+env/
+
+# Project specific
+deprecated/
 .tools/
+.pytest_cache/
+*.zip
+
+# DADN Runtime / Models
+DADN/models/
+DADN/experiments/results/
+.camera-ngrok-url
+.dadn-dashboard-url
+.dadn-dashboard-ngrok.json
+
+# ESP32-CAM Runtime
+ESP32_CAM_Project/.pio/
+ESP32_CAM_Project/.esp32-ngrok-url
+ESP32_CAM_Project/include/wifi_credentials.h
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp

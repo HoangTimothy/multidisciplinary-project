@@ -13,13 +13,13 @@ from typing import Any, Iterable, Iterator, Optional
 
 import cv2
 
-from decision_engine import DecisionEngine, ScoredObstacle
-from detector import DetectionItem, ObstacleDetector
-from experiment_config import ExperimentConfig, load_experiment_config
-from frame_preprocessing import preprocess_for_inference
-from model_registry import get_model_spec
-from model_utils import ensure_model
-from risk_smoothing import AlertSmoother
+from core.decision_engine import DecisionEngine, ScoredObstacle
+from core.detector import DetectionItem, ObstacleDetector
+from core.experiment_config import ExperimentConfig, load_experiment_config
+from core.frame_preprocessing import preprocess_for_inference
+from core.model_registry import get_model_spec
+from core.model_utils import ensure_model
+from core.risk_smoothing import AlertSmoother
 
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}

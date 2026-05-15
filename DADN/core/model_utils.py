@@ -3,7 +3,7 @@ from __future__ import annotations
 import urllib.request
 from pathlib import Path
 
-from config import MODEL_DIR, MODEL_PATH, MODEL_URL
+from core.config import MODEL_DIR, MODEL_PATH, MODEL_URL
 
 
 def ensure_model(model_path: Path | None = None, model_url: str | None = None) -> Path:

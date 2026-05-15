@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import deque
 from typing import Optional
 
-from decision_engine import ScoredObstacle
+from core.decision_engine import ScoredObstacle
 
 
 class AlertSmoother:

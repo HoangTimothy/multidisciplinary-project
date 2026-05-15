@@ -1,11 +1,6 @@
 """
-Video Streaming + Object Detection Server for ESP32-CAM or camera bridges.
-
-The capture path is intentionally decoupled from model inference:
-- capture_stream reads and decodes MJPEG frames as fast as the camera provides them
-- video_feed streams the latest frame immediately with the latest known overlay
-- inference_worker runs EfficientDet on a small latest-frame queue so slow inference
-  cannot stall the live video
+DADN Stream Server: MJPEG frame capture and Object Detection pipeline.
+Decouples frame acquisition from inference to maintain live stream FPS.
 """
 
 from __future__ import annotations
@@ -25,7 +20,7 @@ import numpy as np
 from flask import Flask, Response, jsonify, render_template, request, send_file
 from PIL import Image, ImageDraw, ImageFont
 
-from config import (
+from core.config import (
     ALERT_PRIORITY_THRESHOLD,
     FRAME_HEIGHT,
     FRAME_WIDTH,
@@ -38,13 +33,14 @@ from config import (
     TEMPORAL_ALERT_HOLD_SECONDS,
     TEMPORAL_ALERT_SMOOTHING_ENABLED,
 )
-from decision_engine import DecisionEngine
-from detector import ObstacleDetector
-from frame_preprocessing import preprocess_for_inference
-from model_utils import ensure_model
-from risk_smoothing import AlertSmoother
+from core.decision_engine import DecisionEngine
+from core.detector import ObstacleDetector
+from core.frame_preprocessing import preprocess_for_inference
+from core.model_utils import ensure_model
+from core.risk_smoothing import AlertSmoother
 
-app = Flask(__name__)
+import os as _os
+app = Flask(__name__, template_folder=_os.path.join(_os.path.dirname(__file__), "templates"))
 
 # ==================== CONFIGURATION ====================
 # Camera configuration
@@ -111,7 +107,7 @@ def init_models():
 
 # ==================== FRAME CAPTURE & PROCESSING ====================
 def enqueue_latest_for_inference(seq: int, frame_bgr: np.ndarray) -> None:
-    """Keep only the newest frame for inference to prevent latency buildup."""
+    """Updates inference queue with latest frame, dropping older unprocessed frames."""
     global queue_drop_count
     try:
         while True:
@@ -128,13 +124,7 @@ def enqueue_latest_for_inference(seq: int, frame_bgr: np.ndarray) -> None:
 
 
 def capture_stream():
-    """
-    Capture frames from the camera MJPEG stream.
-
-    This function never waits for the detector. It updates the video buffer and
-    wakes connected clients on every decoded frame, then drops old inference work
-    in favor of the latest frame.
-    """
+    """Main capture loop. Decodes MJPEG chunks and updates global frame buffer."""
     global frame_count, inference_stats
 
     import urllib.request

@@ -19,8 +19,9 @@ from pathlib import Path
 from typing import Optional
 
 
-DEFAULT_URL_FILE = Path(__file__).resolve().parent / ".dadn-dashboard-url"
-DEFAULT_STATE_FILE = Path(__file__).resolve().parent / ".dadn-dashboard-ngrok.json"
+DADN_DIR = Path(__file__).resolve().parent.parent
+DEFAULT_URL_FILE = DADN_DIR / ".dadn-dashboard-url"
+DEFAULT_STATE_FILE = DADN_DIR / ".dadn-dashboard-ngrok.json"
 
 
 def normalize_stream_url(value: str) -> str:
@@ -170,7 +171,7 @@ def ensure_ngrok(port: int, api_base: str, state_file: Path, ngrok_url: Optional
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run DADN dashboard and expose it through ngrok")
     parser.add_argument("--camera-url", default=None, help="ESP32-CAM/ngrok stream URL ending in /stream")
-    parser.add_argument("--camera-url-file", type=Path, default=Path(__file__).resolve().parent / ".camera-ngrok-url")
+    parser.add_argument("--camera-url-file", type=Path, default=DADN_DIR / ".camera-ngrok-url")
     parser.add_argument("--port", type=int, default=5000)
     parser.add_argument("--no-server", action="store_true", help="Only expose an already-running DADN server")
     parser.add_argument("--startup-timeout", type=int, default=180, help="Seconds to wait for DADN /health")
@@ -196,7 +197,7 @@ def main() -> None:
             camera_url = normalize_stream_url(camera_url)
             command = [
                 sys.executable,
-                str(Path(__file__).resolve().parent / "run_stream_server.py"),
+                str(DADN_DIR / "run_stream_server.py"),
                 "--camera-url",
                 camera_url,
                 "--port",
@@ -205,7 +206,7 @@ def main() -> None:
             ]
             print(f"[INFO] Starting DADN dashboard on port {args.port}")
             print(f"[INFO] Camera stream: {camera_url}")
-            server_process = subprocess.Popen(command, cwd=Path(__file__).resolve().parent)
+            server_process = subprocess.Popen(command, cwd=DADN_DIR)
 
         wait_for_dashboard(args.port, args.startup_timeout)
         ngrok_process, public_url = ensure_ngrok(args.port, args.ngrok_api, args.state_file, args.ngrok_url)

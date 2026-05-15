@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable, Optional
 
-from config import (
+from core.config import (
     ALERT_PRIORITY_THRESHOLD,
     CENTER_ZONE_MAX_X,
     CENTER_ZONE_MIN_X,
@@ -20,7 +20,7 @@ from config import (
     NEAR_AREA_RATIO,
     VI_LABELS,
 )
-from detector import DetectionItem
+from core.detector import DetectionItem
 
 
 @dataclass

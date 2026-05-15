@@ -8,7 +8,7 @@ import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
-from config import MAX_RESULTS, MODEL_PATH, SCORE_THRESHOLD
+from core.config import MAX_RESULTS, MODEL_PATH, SCORE_THRESHOLD
 
 
 @dataclass
