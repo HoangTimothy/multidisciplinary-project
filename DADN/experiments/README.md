@@ -134,6 +134,8 @@ latency candidate wins. If no config passes, keep `efficientdet_lite0_int8`.
 
 See `final_benchmark_summary.md` for the current repo conclusion and
 `risk_failure_analysis.md` for the collision-risk failure-analysis workflow.
+The latest Raspberry Pi / ESP32-CAM remote run is recorded in
+`remote_benchmark_20260526.md`.
 
 ## Raspberry Pi handoff
 
