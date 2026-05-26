@@ -17,6 +17,10 @@
 #define DADN_CAMERA_VFLIP 0
 #define DADN_CAMERA_HMIRROR 0
 
+// Capture resolution. Current firmware default is QVGA, but the camera
+// hardware supports higher modes such as VGA, SVGA, XGA, SXGA, and UXGA.
+#define DADN_CAMERA_FRAME_SIZE FRAMESIZE_QVGA
+
 // Long enough for demos, finite so stale ngrok/browser clients are released.
 // Use 0 only if you are sure clients disconnect cleanly.
 #define DADN_STREAM_TIMEOUT_MS 300000

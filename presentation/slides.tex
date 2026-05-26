@@ -1,0 +1,372 @@
+\documentclass[aspectratio=169]{beamer}
+
+\usepackage[T5]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[vietnamese,english]{babel}
+\usepackage{lmodern}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{ragged2e}
+\usepackage{tikz}
+\usepackage{hyperref}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric}
+
+\graphicspath{{../report/graphics/}}
+
+\mode<presentation>
+{
+  \usetheme{Madrid}
+  \usecolortheme{default}
+  \setbeamertemplate{navigation symbols}{}
+  \setbeamertemplate{caption}[numbered]
+}
+
+\setbeamertemplate{footline}{
+  \leavevmode%
+  \hbox{%
+    \begin{beamercolorbox}[wd=.82\paperwidth,ht=2.75ex,dp=1.25ex,leftskip=1em]{author in head/foot}%
+      \usebeamerfont{author in head/foot}\insertshorttitle
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.18\paperwidth,ht=2.75ex,dp=1.25ex,rightskip=1em]{date in head/foot}%
+      \hfill\usebeamerfont{date in head/foot}\insertframenumber{} / \inserttotalframenumber
+    \end{beamercolorbox}%
+  }%
+  \vskip0pt%
+}
+
+\definecolor{hcmutblue}{RGB}{0,61,115}
+\definecolor{hcmutgold}{RGB}{191,144,0}
+\definecolor{softbg}{RGB}{248,250,252}
+\definecolor{softtext}{RGB}{40,40,40}
+
+\setbeamercolor{title}{fg=hcmutblue}
+\setbeamercolor{frametitle}{fg=white,bg=hcmutblue}
+\setbeamercolor{structure}{fg=hcmutblue}
+\setbeamercolor{alerted text}{fg=hcmutgold}
+\setbeamercolor{block title}{fg=white,bg=hcmutblue}
+\setbeamercolor{block body}{bg=softbg,fg=softtext}
+\setbeamercolor{block title example}{fg=white,bg=hcmutgold}
+\setbeamercolor{block body example}{bg=softbg,fg=softtext}
+
+\setbeamertemplate{itemize items}[circle]
+\setbeamertemplate{itemize subitem}[triangle]
+\setbeamertemplate{enumerate items}[default]
+
+\newcolumntype{Y}{>{\RaggedRight\arraybackslash}X}
+
+\title[CBVC]{Hệ Thống Cảnh Báo Vật Cản Bằng Giọng Nói\\Cho Người Khiếm Thị Ứng Dụng Mạng TinyML}
+\subtitle{Đồ án đa ngành hướng Trí tuệ Nhân tạo}
+\author[Nhóm đồ án]{Nhóm đồ án}
+\institute{Khoa Khoa học và Kỹ thuật Máy tính\\Trường Đại học Bách khoa - ĐHQG TP.HCM}
+\date{Tháng 5 năm 2026}
+
+\begin{document}
+
+\begin{frame}[plain]
+  \begin{center}
+    \vspace{0.25cm}
+    \includegraphics[height=1.35cm]{hcmut.png}
+
+    \vspace{0.6cm}
+    {\Large\bfseries\parbox{0.95\textwidth}{\centering Hệ Thống Cảnh Báo Vật Cản Bằng Giọng Nói\\Cho Người Khiếm Thị Ứng Dụng Mạng TinyML\par}}
+
+    \vspace{0.45cm}
+    {\normalsize Đồ án đa ngành hướng Trí tuệ Nhân tạo\par}
+
+    \vspace{0.65cm}
+    {\normalsize Nhóm đồ án\par}
+    \vspace{0.15cm}
+    {\scriptsize Nguyễn Đăng Hiên \quad Lê Nguyễn Kim Khôi \quad Bùi Ngọc Phúc\par}
+    {\scriptsize Hồ Anh Dũng \quad Cao Hữu Thiên Hoàng\par}
+
+    \vfill
+    {\small Khoa Khoa học và Kỹ thuật Máy tính\\Trường Đại học Bách khoa - ĐHQG TP.HCM\\Tháng 5 năm 2026\par}
+  \end{center}
+\end{frame}
+
+\begin{frame}{Bối cảnh}
+  \begin{columns}[T,onlytextwidth]
+    \column{0.58\textwidth}
+    \begin{itemize}
+      \item Người khiếm thị cần thông tin sớm về vật cản phía trước.
+      \item Gậy dò đường đơn giản nhưng chỉ hữu ích ở khoảng cách rất gần.
+      \item Camera + AI có thể phát hiện người, xe, ghế, chướng ngại vật từ sớm hơn.
+      \item Mục tiêu là tạo một pipeline nhẹ, chạy được ở edge, dễ demo.
+    \end{itemize}
+    \vspace{0.5em}
+    \begin{block}{Thông điệp chính}
+      Bài toán không chỉ là nhận diện vật thể, mà là chuyển detection thô thành cảnh báo hữu ích và ít gây nhiễu.
+    \end{block}
+    \column{0.42\textwidth}
+    \begin{block}{Ngữ cảnh sử dụng}
+      \begin{itemize}
+        \item Hành lang
+        \item Sân trường
+        \item Vỉa hè
+        \item Khu vực công cộng
+      \end{itemize}
+    \end{block}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Mục tiêu và phạm vi}
+  \begin{columns}[T,onlytextwidth]
+    \column{0.5\textwidth}
+    \begin{block}{Mục tiêu}
+      \begin{itemize}
+        \item Đọc stream từ ESP32-CAM qua MJPEG.
+        \item Chạy object detection nhẹ bằng EfficientDet-Lite0 int8.
+        \item Ước lượng gần-xa tương đối và trái-giữa-phải.
+        \item Chọn vật thể nguy hiểm nhất để cảnh báo.
+        \item Hiển thị dashboard và phát TTS tiếng Việt.
+      \end{itemize}
+    \end{block}
+    \column{0.5\textwidth}
+    \begin{block}{Phạm vi thực tế}
+      \begin{itemize}
+        \item ESP32-CAM chỉ đóng vai trò camera mạng.
+        \item AI chạy trên Raspberry Pi hoặc máy tính thử nghiệm.
+        \item Chưa đo khoảng cách tuyệt đối theo mét.
+        \item Chưa có tracking temporal ổn định giữa các frame.
+      \end{itemize}
+    \end{block}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Giải pháp tổng thể}
+  \centering
+  \resizebox{\textwidth}{!}{%
+  \begin{tikzpicture}[
+    font=\scriptsize,
+    node distance=0.55cm and 0.8cm,
+    box/.style={draw, rounded corners, align=center, minimum width=2.75cm, minimum height=0.9cm, fill=softbg},
+    main/.style={draw, rounded corners, align=center, minimum width=2.95cm, minimum height=1.0cm, fill=hcmutblue!8},
+    arrow/.style={-{Latex[length=2.4mm]}, thick}
+  ]
+    \node[main] (cam) {ESP32-CAM\\Thu hình + phát MJPEG};
+    \node[box, right=of cam] (ingest) {DADN ingest\\Giải mã frame};
+    \node[box, right=of ingest] (infer) {Inference worker\\EfficientDet-Lite0 int8};
+    \node[box, right=of infer] (decision) {Decision Engine\\Chấm điểm nguy hiểm};
+    \node[box, right=of decision] (ui) {Flask dashboard\\Overlay + TTS};
+
+    \draw[arrow] (cam) -- (ingest);
+    \draw[arrow] (ingest) -- (infer);
+    \draw[arrow] (infer) -- (decision);
+    \draw[arrow] (decision) -- (ui);
+  \end{tikzpicture}%
+  }
+
+  \vspace{0.8em}
+  \begin{block}{Ý tưởng thiết kế}
+    Tách đường video và đường suy luận để dashboard vẫn phản hồi tốt ngay cả khi model chạy chậm hơn camera.
+  \end{block}
+\end{frame}
+
+\begin{frame}{Kiến trúc xử lý}
+  \begin{columns}[T,onlytextwidth]
+    \column{0.62\textwidth}
+    \begin{figure}
+      \centering
+      \resizebox{\linewidth}{!}{%
+      \begin{tikzpicture}[
+        font=\scriptsize,
+        node distance=0.45cm and 0.7cm,
+        layer/.style={draw, rounded corners, align=center, minimum width=2.75cm, minimum height=0.82cm, fill=gray!8},
+        service/.style={draw, rounded corners, align=center, minimum width=2.75cm, minimum height=0.82cm, fill=blue!5},
+        arrow/.style={-{Latex[length=2.2mm]}, thick},
+        control/.style={-{Latex[length=2.0mm]}, dashed}
+      ]
+        \node[layer] (acq) {Acquisition\\ESP32-CAM};
+        \node[layer, right=of acq] (transport) {Transport\\HTTP MJPEG};
+        \node[layer, right=of transport] (ingest) {Ingestion\\JPEG decode};
+        \node[service, below=of ingest] (buffer) {Shared state\\latest frame};
+        \node[service, left=of buffer] (infer) {Inference\\latest-frame queue};
+        \node[service, left=of infer] (decision) {Decision Engine\\class + distance + zone};
+        \node[service, below=of decision] (alert) {Alert output\\spoken text};
+        \node[service, below=of buffer] (dash) {Dashboard\\video feed};
+        \node[service, right=of dash] (api) {Monitoring API\\health/stats/config};
+
+        \draw[arrow] (acq) -- (transport);
+        \draw[arrow] (transport) -- (ingest);
+        \draw[arrow] (ingest) -- (buffer);
+        \draw[arrow] (buffer) -- (infer);
+        \draw[arrow] (infer) -- (decision);
+        \draw[arrow] (decision) -- (alert);
+        \draw[arrow] (buffer) -- (dash);
+        \draw[arrow] (decision) |- (dash);
+        \draw[control] (buffer) -- (api);
+        \draw[control] (dash) -- (api);
+      \end{tikzpicture}%
+      }
+    \end{figure}
+    \column{0.38\textwidth}
+    \begin{block}{Điểm mạnh}
+      \begin{itemize}
+        \item Giảm backlog frame.
+        \item Dashboard vẫn mượt.
+        \item Dễ debug theo từng khối.
+      \end{itemize}
+    \end{block}
+    \begin{block}{API chính}
+      \begin{itemize}
+        \item \texttt{/}
+        \item \texttt{/video\_feed}
+        \item \texttt{/health}
+        \item \texttt{/api/stats}
+        \item \texttt{/tts}
+      \end{itemize}
+    \end{block}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Decision Engine}
+  \begin{columns}[T,onlytextwidth]
+    \column{0.52\textwidth}
+    \begin{block}{Lọc và ưu tiên}
+      \begin{itemize}
+        \item Giữ các lớp ảnh hưởng đến an toàn di chuyển.
+        \item Ưu tiên cao: person, bicycle, motorcycle, car, bus, truck.
+        \item Ưu tiên trung bình: chair, bench, suitcase, backpack, potted plant.
+      \end{itemize}
+    \end{block}
+    \begin{block}{Heuristic chọn cảnh báo}
+      \begin{itemize}
+        \item Gần-xa dựa trên diện tích bbox.
+        \item Trái-giữa-phải dựa trên tâm bbox.
+        \item Chọn detection có priority cao nhất.
+      \end{itemize}
+    \end{block}
+    \column{0.48\textwidth}
+    \begin{exampleblock}{Sinh cảnh báo}
+      \begin{itemize}
+        \item “Cẩn thận, có người ở giữa, rất gần.”
+        \item “Có xe máy bên phải, mức nguy hiểm cao.”
+        \item Có cooldown để tránh lặp âm thanh.
+      \end{itemize}
+    \end{exampleblock}
+    \begin{block}{Hạn chế}
+      \begin{itemize}
+        \item Chưa đo khoảng cách tuyệt đối.
+        \item Chưa có tracking ổn định giữa frame.
+        \item Có thể dao động khi detection thay đổi nhanh.
+      \end{itemize}
+    \end{block}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Triển khai và vận hành}
+  \footnotesize
+  \begin{columns}[T,onlytextwidth]
+    \column{0.56\textwidth}
+    \begin{block}{Thành phần chính}
+      \begin{itemize}
+        \item \texttt{ESP32\_CAM\_Project/src/main.cpp}: firmware camera.
+        \item \texttt{DADN/stream\_server.py}: server inference và dashboard.
+        \item \texttt{DADN/decision\_engine.py}: chấm điểm và tạo cảnh báo.
+        \item \texttt{DADN/tts\_engine.py}: phát âm thanh hỗ trợ demo.
+      \end{itemize}
+    \end{block}
+    \vspace{-0.2em}
+    \begin{block}{Kịch bản demo}
+      \begin{itemize}
+        \item ESP32-CAM phát stream tại \texttt{/stream}.
+        \item DADN server nhận URL camera và mở dashboard.
+        \item Nếu khác mạng, bọc bằng ngrok để public stream hoặc dashboard.
+      \end{itemize}
+    \end{block}
+    \column{0.44\textwidth}
+    \begin{block}{Khi demo từ xa}
+      \begin{itemize}
+        \item Camera có thể ở mạng riêng.
+        \item Server inference có thể ở máy chạy model hoặc Raspberry Pi.
+        \item Dashboard có thể public qua ngrok.
+      \end{itemize}
+    \end{block}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Kết quả benchmark}
+  \scriptsize
+  \begin{columns}[T,onlytextwidth]
+    \column{0.48\textwidth}
+    \begin{block}{Dataset và tune}
+      \begin{itemize}
+        \item 500 ảnh public từ COCO val2017 và BDD100K validation.
+        \item Label set: \texttt{person}, \texttt{vehicle}, \texttt{static\_obstacle}.
+        \item Winner config: \texttt{tuned\_lite0\_int8\_high\_recall}.
+        \item Tuned params cốt lõi: \texttt{SCORE\_THRESHOLD = 0.35}, \texttt{MAX\_RESULTS = 15}, \texttt{INFER\_EVERY\_N\_FRAMES = 5}, denoise + low-light.
+      \end{itemize}
+    \end{block}
+    \column{0.52\textwidth}
+    \begin{block}{Số liệu chính}
+      \begin{itemize}
+        \item Public 500 ảnh COCO+BDD: alert correctness 0.812, p95 31.4 ms.
+        \item Lite2 int8: alert correctness 0.842, p95 84.7 ms.
+        \item Synthetic robustness: risk alert correctness 0.827, p95 35.6 ms.
+      \end{itemize}
+    \end{block}
+    \begin{exampleblock}{Ghi chú}
+      Benchmark này là public dataset + synthetic robustness. FPS và server-side alert latency vẫn cần đo trên Raspberry Pi; full camera-to-audio end-to-end latency cần instrumentation riêng.
+    \end{exampleblock}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Những chỉ số còn phải benchmark thật}
+  \footnotesize
+  \begin{block}{Cần benchmark thật}
+    \begin{itemize}
+      \item FPS trung bình trên Raspberry Pi hoặc máy demo thật.
+      \item Độ trễ server-side alert từ frame vào đến cảnh báo.
+      \item Độ ổn định stream trên LAN và ngrok.
+      \item False alert trên frame âm tính.
+      \item Độ trễ TTS khi phát từ browser hoặc engine offline.
+    \end{itemize}
+  \end{block}
+
+  \begin{exampleblock}{Ghi chú trình bày}
+    Không suy diễn benchmark public dataset thành runtime thật. Nếu cần full camera-to-audio end-to-end latency, phải đo bằng instrumentation hoặc video sync riêng.
+  \end{exampleblock}
+\end{frame}
+
+\begin{frame}{Hạn chế và hướng phát triển}
+  \begin{columns}[T,onlytextwidth]
+    \column{0.5\textwidth}
+    \begin{block}{Hạn chế hiện tại}
+      \begin{itemize}
+        \item Chưa có depth thật.
+        \item Chưa có tracking temporal.
+        \item TTS demo còn phụ thuộc môi trường chạy.
+        \item Stream có thể bị ảnh hưởng bởi Wi-Fi/ngrok.
+      \end{itemize}
+    \end{block}
+    \column{0.5\textwidth}
+    \begin{block}{Hướng phát triển}
+      \begin{itemize}
+        \item Bổ sung tracking ngắn hạn.
+        \item Nâng cấp sang TTC proxy hoặc monocular depth.
+        \item Tối ưu TTS offline bất đồng bộ.
+        \item Đo server-side alert latency trên Raspberry Pi và bổ sung camera-to-audio end-to-end nếu có instrumentation.
+        \item Tinh chỉnh dữ liệu Việt Nam thực tế.
+      \end{itemize}
+    \end{block}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Kết luận}
+  \begin{block}{Thông điệp chốt}
+    Đồ án đã ghép được một pipeline hoàn chỉnh: camera mạng, suy luận object detection nhẹ, Decision Engine chọn cảnh báo, và dashboard giám sát thời gian thực.
+  \end{block}
+  \begin{itemize}
+    \item Phù hợp để demo end-to-end trong bối cảnh đồ án.
+    \item Có nền tảng rõ để tiếp tục tối ưu latency và độ tin cậy.
+    \item Bước tiếp theo là đo thực nghiệm trên thiết bị thật.
+  \end{itemize}
+  \vfill
+  \begin{center}
+    \Large{Q\&A}
+  \end{center}
+\end{frame}
+
+\end{document}

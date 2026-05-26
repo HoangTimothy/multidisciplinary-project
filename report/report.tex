@@ -135,13 +135,13 @@ Người dùng mục tiêu là người khiếm thị hoặc người có thị 
   \item Hành lang hoặc sân trường: hệ thống phát hiện người hoặc ghế chắn giữa lối đi và cảnh báo để người dùng đổi hướng.
   \item Vỉa hè hoặc lối đi ngoài trời: hệ thống phát hiện xe máy, xe đạp hoặc vật cản lớn nằm gần hướng di chuyển.
   \item Nhiều vật thể cùng lúc: hệ thống không đọc toàn bộ nhãn, mà chọn đối tượng có điểm nguy hiểm cao nhất.
-  \item Demo từ xa: ESP32-CAM chạy ở một mạng, DADN server chạy ở Raspberry Pi hoặc laptop khác, luồng camera được chuyển qua ngrok.
+  \item Demo từ xa: ESP32-CAM chạy ở một mạng, DADN server chạy ở Raspberry Pi hoặc một máy chạy model khác, luồng camera được chuyển qua ngrok.
 \end{itemize}
 
 \section{Thiết kế hệ thống}
 
 \subsection{Kiến trúc tổng thể}
-Hệ thống được thiết kế theo mô hình pipeline biên, trong đó ESP32-CAM chỉ chịu trách nhiệm thu ảnh và phát luồng hình, còn DADN server chịu trách nhiệm giải mã, suy luận, ra quyết định và phục vụ giao diện. Cách tách này phù hợp với giới hạn tài nguyên của ESP32-CAM: vi điều khiển không cần chạy mô hình AI, nhưng vẫn cung cấp được dữ liệu hình ảnh thời gian thực cho thiết bị biên mạnh hơn như Raspberry Pi hoặc laptop.
+Hệ thống được thiết kế theo mô hình pipeline biên, trong đó ESP32-CAM chỉ chịu trách nhiệm thu ảnh và phát luồng hình, còn DADN server chịu trách nhiệm giải mã, suy luận, ra quyết định và phục vụ giao diện. Cách tách này phù hợp với giới hạn tài nguyên của ESP32-CAM: vi điều khiển không cần chạy mô hình AI, nhưng vẫn cung cấp được dữ liệu hình ảnh thời gian thực cho thiết bị biên mạnh hơn như Raspberry Pi hoặc một máy chạy model khác.
 
 Về mặt kiến trúc, hệ thống có hai mặt phẳng xử lý. \textit{Data plane} là đường đi của frame camera từ ESP32-CAM đến detector và dashboard. \textit{Control/monitoring plane} là nhóm endpoint kiểm tra sức khỏe, cấu hình và thống kê dùng cho demo, debug và nghiệm thu. Việc tách hai mặt phẳng này giúp hệ thống dễ quan sát khi stream bị rớt, model tải chậm hoặc FPS giảm.
 
@@ -295,9 +295,9 @@ Decision Engine sinh câu cảnh báo tiếng Việt theo mức gần--xa và h�
 \end{table}
 
 \subsection{Cấu hình quan trọng}
-Các tham số quan trọng được gom vào \texttt{config.py}, gồm đường dẫn model, URL tải model EfficientDet-Lite0 int8, kích thước frame, chu kỳ suy luận, ngưỡng confidence, số detection tối đa, ngưỡng gần--xa, vùng trung tâm, cooldown giọng nói và nhãn tiếng Việt. Sau benchmark laptop trên subset COCO+BDD, cấu hình hiện tại dùng \texttt{INFER\_EVERY\_N\_FRAMES = 5}, \texttt{SCORE\_THRESHOLD = 0.4} và \texttt{MAX\_RESULTS = 10} để tăng recall nhưng vẫn giữ model int8 nhẹ cho Raspberry Pi. Việc gom cấu hình giúp nhóm dễ tinh chỉnh khi chuyển từ laptop sang Raspberry Pi hoặc khi đổi camera.
+Các tham số quan trọng được gom vào \texttt{config.py}, gồm đường dẫn model, URL tải model EfficientDet-Lite0 int8, kích thước frame, chu kỳ suy luận, ngưỡng confidence, số detection tối đa, ngưỡng gần--xa, vùng trung tâm, cooldown giọng nói và nhãn tiếng Việt. Bộ benchmark public dùng 500 ảnh lấy từ COCO val2017 và BDD100K validation, với nhãn group-level \texttt{person}, \texttt{vehicle} và \texttt{static\_obstacle}. Cấu hình winner/tuned hiện tại là \texttt{tuned\_lite0\_int8\_high\_recall}: \texttt{SCORE\_THRESHOLD = 0.35}, \texttt{MAX\_RESULTS = 15}, \texttt{INFER\_EVERY\_N\_FRAMES = 5}, bật preprocessing denoise và low-light, giữ \texttt{NEAR\_AREA\_RATIO = 0.18}, \texttt{MEDIUM\_AREA\_RATIO = 0.06}, \texttt{CENTER\_ZONE\_MIN\_X = 0.25}, \texttt{CENTER\_ZONE\_MAX\_X = 0.75}, \texttt{LOWER\_ZONE\_MIN\_Y = 0.4}, \texttt{SPEAK\_COOLDOWN\_SECONDS = 3.0}, \texttt{TEMPORAL\_HOLD\_FRAMES = 2} và \texttt{TEMPORAL\_HOLD\_SECONDS = 0.8}. Việc gom cấu hình giúp nhóm dễ tinh chỉnh khi đổi camera hoặc đổi điều kiện chạy thực tế.
 
-Với benchmark, cấu hình được tách thành JSON để mô tả một experiment đầy đủ: model, threshold, số detection, kích thước frame, chu kỳ inference, queue size, ngưỡng gần--xa, vùng trung tâm, trọng số distance/center/direction và cooldown âm thanh. Cách này giúp chạy lại cùng một cấu hình trên laptop hoặc Raspberry Pi và so sánh kết quả bằng cùng một format.
+Với benchmark, cấu hình được tách thành JSON để mô tả một experiment đầy đủ: model, threshold, số detection, kích thước frame, chu kỳ inference, queue size, ngưỡng gần--xa, vùng trung tâm, trọng số distance/center/direction và cooldown âm thanh. Cách này giúp chạy lại cùng một cấu hình trên nhiều thiết bị và so sánh kết quả bằng cùng một format.
 
 \subsection{Dashboard và API}
 Dashboard Flask cung cấp các endpoint chính:
@@ -340,7 +340,7 @@ Kiểm thử nhằm xác nhận hệ thống không chỉ nhận diện vật th
 
 Sau khi cập nhật pipeline stream, nhóm đã chạy kiểm tra tự động ở mức repository. Các kiểm tra gồm compile cú pháp Python cho \texttt{stream\_server.py}, \texttt{run\_stream\_server.py}, \texttt{config.py}, smoke test route Flask bằng test client và test các helper ngrok. Kết quả hiện tại là 20 test passed, 3 integration test skipped vì các test đó cần server thật và biến môi trường \texttt{DADN\_TEST\_SERVER\_URL}. Điều này xác nhận phần helper và route cơ bản hoạt động, nhưng chưa thay thế cho kiểm thử thực nghiệm với camera thật.
 
-Sau phần tuning, test tự động được mở rộng cho model registry, experiment config, decision-parameter override và policy chọn winner. Benchmark runner đã có chế độ \texttt{--dry-run} để kiểm tra dataset/config/output mà không cần nạp model; khi chạy thật, runner đo \texttt{avg/p50/p95} latency, detection rate, alert rate, alert correctness và điểm balanced score. Policy chốt model yêu cầu tối thiểu 200 mẫu có nhãn và \texttt{alert\_correctness >= 0.75}; nếu các điểm balanced score sát nhau dưới 0.03 thì ưu tiên p95 latency thấp hơn. Benchmark public subset 500 ảnh COCO+BDD đã chọn \texttt{tuned\_lite0\_int8\_high\_recall}: EfficientDet-Lite0 int8 với \texttt{SCORE\_THRESHOLD = 0.4}, \texttt{MAX\_RESULTS = 10}.
+Sau phần tuning, test tự động được mở rộng cho model registry, experiment config, decision-parameter override và policy chọn winner. Benchmark runner đã có chế độ \texttt{--dry-run} để kiểm tra dataset/config/output mà không cần nạp model; khi chạy thật, runner đo \texttt{avg/p50/p95} latency, detection rate, alert rate, alert correctness và điểm balanced score. Policy chốt model yêu cầu tối thiểu 200 mẫu có nhãn và \texttt{alert\_correctness >= 0.75}; nếu các điểm balanced score sát nhau dưới 0.03 thì ưu tiên p95 latency thấp hơn. Bộ dữ liệu benchmark là 500 ảnh public từ COCO val2017 và BDD100K validation, gán nhãn group-level \texttt{person}, \texttt{vehicle} và \texttt{static\_obstacle}. Bộ tham số được tune thành \texttt{tuned\_lite0\_int8\_high\_recall} với \texttt{SCORE\_THRESHOLD = 0.35}, \texttt{MAX\_RESULTS = 15}, \texttt{INFER\_EVERY\_N\_FRAMES = 5}, preprocessing denoise + low-light, \texttt{NEAR\_AREA\_RATIO = 0.18}, \texttt{MEDIUM\_AREA\_RATIO = 0.06}, vùng trung tâm \texttt{[0.25, 0.75]}, \texttt{LOWER\_ZONE\_MIN\_Y = 0.4} và temporal hold 2 frame trong 0.8 giây.
 
 \begin{table}[H]
   \centering
@@ -364,7 +364,7 @@ Sau phần tuning, test tự động được mở rộng cho model registry, ex
 \end{table}
 
 \subsection{Chỉ số cần đo thực nghiệm}
-Benchmark offline trên laptop đã có runner, dataset public subset và policy chọn model. Kết quả này đủ để chọn production candidate laptop-first, nhưng vẫn cần nghiệm thu runtime trên Raspberry Pi/ESP32-CAM trước khi gọi là cấu hình production phần cứng.
+Benchmark offline trên bộ dữ liệu public đã có runner, dataset và policy chọn model. Kết quả này đủ để chốt cấu hình hiện tại, nhưng vẫn cần nghiệm thu runtime trên Raspberry Pi/ESP32-CAM trước khi gọi là cấu hình production phần cứng.
 \begin{table}[H]
   \centering
   \caption{Bảng chỉ số thực nghiệm cần cập nhật sau khi chạy demo}
@@ -374,7 +374,7 @@ Benchmark offline trên laptop đã có runner, dataset public subset và policy
     \textbf{Chỉ số} & \textbf{Cách đo} & \textbf{Giá trị hiện tại} \\
     \midrule
     FPS trung bình & Ghi nhận FPS hiển thị hoặc \texttt{current\_fps} trong \texttt{/api/stats} trong 60 giây & Chưa đo trên Pi; cần nghiệm thu runtime \\
-    Độ trễ suy luận & Thời gian suy luận offline trên laptop theo \texttt{benchmark\_inference.py} & Winner \texttt{tuned\_lite0\_int8\_high\_recall}: p95 31.4 ms, avg 28.1 ms trên 500 ảnh \\
+    Độ trễ suy luận & Thời gian suy luận theo \texttt{benchmark\_inference.py} trên 500 ảnh COCO val2017 + BDD100K validation & Winner \texttt{tuned\_lite0\_int8\_high\_recall}: p95 31.4 ms, avg 28.1 ms \\
     Độ trễ end-to-end & Thời gian từ lúc vật cản xuất hiện đến khi dashboard/TTS hiển thị cảnh báo & Chưa đo trên Pi; cần đo cùng ESP32-CAM và dashboard \\
     Tỷ lệ cảnh báo đúng vật thể ưu tiên & Số tình huống chọn đúng vật nguy hiểm nhất trên tổng số tình huống test & Group-level \texttt{alert\_correctness = 0.812} trên subset COCO+BDD 500 ảnh \\
     Độ ổn định stream & Số lần reconnect trong 5 phút với LAN và ngrok & Chưa đo trên Pi; cần nghiệm thu LAN và ngrok \\
@@ -401,7 +401,7 @@ Các hướng mở rộng phù hợp gồm:
   \item Tích hợp TTS offline bất đồng bộ hoàn chỉnh để không phụ thuộc dịch vụ mạng khi chạy ngoài hiện trường.
   \item Thêm trang cấu hình dashboard để nhập stream URL, inference interval và threshold mà không sửa code.
   \item Tinh chỉnh hoặc huấn luyện mô hình với dữ liệu thực tế tại Việt Nam, đặc biệt là xe máy, vỉa hè và vật cản thấp.
-  \item Đo và tối ưu end-to-end latency trên Raspberry Pi thay vì chỉ kiểm tra trên laptop.
+  \item Đo và tối ưu server-side alert latency trên Raspberry Pi; nếu cần full camera-to-audio end-to-end thì bổ sung instrumentation đồng bộ.
 \end{itemize}
 
 \section{Kết luận}

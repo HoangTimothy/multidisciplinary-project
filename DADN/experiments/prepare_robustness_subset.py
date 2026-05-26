@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import hashlib
 from pathlib import Path
 from typing import Any
 
@@ -46,43 +47,77 @@ def label_for(labels: dict[str, dict[str, Any]], image_path: Path) -> dict[str, 
     return dict(labels.get(image_path.name) or labels.get(image_path.stem) or {})
 
 
-def motion_blur(image: np.ndarray) -> np.ndarray:
-    kernel = np.zeros((9, 9), dtype=np.float32)
-    kernel[4, :] = 1.0 / 9.0
+def stable_seed(*parts: str, base_seed: int = 42) -> int:
+    payload = "::".join((str(base_seed), *parts)).encode("utf-8")
+    digest = hashlib.blake2b(payload, digest_size=8).digest()
+    return int.from_bytes(digest, "little", signed=False)
+
+
+def motion_blur(image: np.ndarray, rng: np.random.Generator, severity: int) -> np.ndarray:
+    size = {1: 7, 2: 9, 3: 13}.get(severity, 9)
+    kernel = np.zeros((size, size), dtype=np.float32)
+    direction = rng.choice(["horizontal", "vertical", "diag_l", "diag_r"])
+    if direction == "horizontal":
+        kernel[size // 2, :] = 1.0 / size
+    elif direction == "vertical":
+        kernel[:, size // 2] = 1.0 / size
+    elif direction == "diag_l":
+        np.fill_diagonal(kernel, 1.0 / size)
+    else:
+        np.fill_diagonal(np.fliplr(kernel), 1.0 / size)
     return cv2.filter2D(image, -1, kernel)
 
 
-def noise(image: np.ndarray) -> np.ndarray:
-    rng = np.random.default_rng(42)
-    noisy = image.astype(np.int16) + rng.normal(0, 18, image.shape).astype(np.int16)
+def noise(image: np.ndarray, rng: np.random.Generator, severity: int) -> np.ndarray:
+    sigma = {1: 12.0, 2: 18.0, 3: 28.0}.get(severity, 18.0)
+    noisy = image.astype(np.int16) + rng.normal(0, sigma, image.shape).astype(np.int16)
     return np.clip(noisy, 0, 255).astype(np.uint8)
 
 
-def low_light(image: np.ndarray) -> np.ndarray:
-    dark = (image.astype(np.float32) * 0.48).astype(np.uint8)
-    return cv2.convertScaleAbs(dark, alpha=1.25, beta=4)
+def low_light(image: np.ndarray, rng: np.random.Generator, severity: int) -> np.ndarray:
+    brightness = {1: 0.62, 2: 0.48, 3: 0.34}.get(severity, 0.48)
+    gamma = {1: 1.2, 2: 1.4, 3: 1.8}.get(severity, 1.4)
+    dark = cv2.convertScaleAbs(image, alpha=brightness, beta=int(rng.integers(-4, 5)))
+    table = np.array([((i / 255.0) ** gamma) * 255 for i in range(256)]).astype("uint8")
+    return cv2.LUT(dark, table)
 
 
-def jpeg_low_quality(image: np.ndarray) -> np.ndarray:
-    ok, encoded = cv2.imencode(".jpg", image, [int(cv2.IMWRITE_JPEG_QUALITY), 32])
+def jpeg_low_quality(image: np.ndarray, rng: np.random.Generator, severity: int) -> np.ndarray:
+    quality = {1: 40, 2: 32, 3: 20}.get(severity, 32)
+    quality = int(np.clip(quality + rng.integers(-4, 5), 10, 60))
+    ok, encoded = cv2.imencode(".jpg", image, [int(cv2.IMWRITE_JPEG_QUALITY), quality])
     if not ok:
         return image
     decoded = cv2.imdecode(encoded, cv2.IMREAD_COLOR)
     return decoded if decoded is not None else image
 
 
-def center_occlusion(image: np.ndarray) -> np.ndarray:
+def center_occlusion(image: np.ndarray, rng: np.random.Generator, severity: int) -> np.ndarray:
     result = image.copy()
     height, width = result.shape[:2]
-    x1, x2 = int(width * 0.38), int(width * 0.62)
-    y1, y2 = int(height * 0.38), int(height * 0.68)
+    scale = {1: 0.18, 2: 0.24, 3: 0.32}.get(severity, 0.24)
+    box_w = max(12, int(width * scale))
+    box_h = max(12, int(height * (scale + 0.08)))
+    center_x = int(width * 0.5 + rng.integers(-width * 0.03, width * 0.03 + 1))
+    center_y = int(height * 0.53 + rng.integers(-height * 0.03, height * 0.03 + 1))
+    x1 = int(np.clip(center_x - box_w // 2, 0, width - 1))
+    y1 = int(np.clip(center_y - box_h // 2, 0, height - 1))
+    x2 = int(np.clip(x1 + box_w, 0, width))
+    y2 = int(np.clip(y1 + box_h, 0, height))
     cv2.rectangle(result, (x1, y1), (x2, y2), (35, 35, 35), thickness=-1)
     return result
 
 
-def esp32_resize(image: np.ndarray) -> np.ndarray:
+def esp32_resize(image: np.ndarray, rng: np.random.Generator, severity: int) -> np.ndarray:
     height, width = image.shape[:2]
-    small = cv2.resize(image, (320, 240), interpolation=cv2.INTER_AREA)
+    small_w, small_h = {
+        1: (320, 240),
+        2: (240, 180),
+        3: (160, 120),
+    }.get(severity, (320, 240))
+    small = cv2.resize(image, (small_w, small_h), interpolation=cv2.INTER_AREA)
+    if rng.random() < 0.4:
+        small = cv2.GaussianBlur(small, (3, 3), 0)
     return cv2.resize(small, (width, height), interpolation=cv2.INTER_LINEAR)
 
 
@@ -109,6 +144,8 @@ def main() -> int:
         choices=sorted(TRANSFORMS),
         help="Variant to generate; may be repeated. Defaults to all variants.",
     )
+    parser.add_argument("--severity", type=int, choices=[1, 2, 3], default=2, help="Augmentation severity level")
+    parser.add_argument("--seed", type=int, default=42, help="Base seed for deterministic augmentation")
     args = parser.parse_args()
 
     files = image_files(args.input)
@@ -129,7 +166,8 @@ def main() -> int:
             continue
         source_label = label_for(labels, image_path)
         for variant in variants:
-            transformed = TRANSFORMS[variant](image)
+            rng = np.random.default_rng(stable_seed(image_path.name, variant, base_seed=args.seed))
+            transformed = TRANSFORMS[variant](image, rng, args.severity)
             item_id = f"{image_path.stem}__{variant}.jpg"
             out_path = args.output / item_id
             cv2.imwrite(str(out_path), transformed, [int(cv2.IMWRITE_JPEG_QUALITY), 85])

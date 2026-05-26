@@ -2,7 +2,7 @@
 
 ## Current conclusion
 
-The laptop-first public benchmark now passes the evidence gate. The selected
+The public offline benchmark now passes the evidence gate. The selected
 production candidate is `tuned_lite0_int8_high_recall`: EfficientDet-Lite0 int8
 with `score_threshold = 0.35` and `max_results = 15`.
 
@@ -28,7 +28,7 @@ robustness set, this raised `risk_alert_correctness` from 0.800 to 0.827.
 - If the best scores are within `0.03`, select the lower `p95_latency_ms`.
 - If no config is eligible, keep `efficientdet_lite0_int8`.
 
-## Final laptop evidence
+## Final offline evidence
 
 Dataset: 500 public images, built from 250 COCO val2017 images and 250 BDD100K
 validation images. Labels are group-level (`person`, `vehicle`,
@@ -73,7 +73,7 @@ runnable with the current `ObstacleDetector` pipeline: EfficientDet-Lite0
 int8/float16/float32, EfficientDet-Lite2 int8/float16/float32, and SSD
 MobileNetV2 float16/float32. MediaPipe documentation lists SSD MobileNetV2 as
 the speed-oriented family, but the downloadable artifacts did not beat tuned
-Lite0 int8 on this laptop pipeline. A separate SSD MobileNetV2 int8 path was
+Lite0 int8 on this offline pipeline. A separate SSD MobileNetV2 int8 path was
 checked, but `/ssd_mobilenet_v2/int8/latest/ssd_mobilenet_v2.tflite` returned
 404, so it was not kept as a runnable repo candidate.
 
@@ -117,6 +117,7 @@ balanced score for every config.
 
 ## Production handoff note
 
-This conclusion is laptop-first. Before calling the config final for production
-hardware, run `benchmark_stream.py` on the Raspberry Pi/ESP32-CAM demo for FPS,
-reconnect stability, and end-to-end alert timing.
+This conclusion is based on offline dataset evidence. Before calling the config
+final for production hardware, run `record_metrics.py` or `benchmark_stream.py`
+on the Raspberry Pi/ESP32-CAM demo for FPS, reconnect stability, and
+server-side alert latency.

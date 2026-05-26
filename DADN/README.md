@@ -18,6 +18,7 @@ Python server for receiving an ESP32-CAM MJPEG stream and running real-time obje
 - `run_stream_server.py`: convenient launcher script
 - `benchmark_inference.py`: offline benchmark runner for image/video datasets
 - `benchmark_stream.py`: polls a running dashboard for FPS/latency/drop metrics
+- `record_metrics.py`: report-ready wrapper for offline correctness and runtime metrics
 - `expose_dashboard_ngrok.py`: Raspberry Pi launcher for public demo dashboard
 - `detector.py`: MediaPipe detector wrapper
 - `decision_engine.py`: obstacle scoring and alert logic
@@ -70,24 +71,22 @@ Labels are required for a defensible model choice. Without matching labels,
 the runner reports `alert_correctness: null` and `risk_alert_correctness: null`,
 marks every config ineligible, and falls back to the current default model.
 
-```bash
-python experiments/prepare_public_subset.py \
-  --coco-annotations /data/coco/annotations/instances_val2017.json \
-  --bdd-fiftyone-samples /data/bdd100k/samples.json \
-  --bdd-hf-repo dgural/bdd100k \
-  --output-dir /data/dadn-public-subset/images \
-  --labels-out /data/dadn-public-subset/labels.json \
-  --label-detail group
-```
-
 Outputs are written to `experiments/results/<timestamp>/` and ignored by Git.
 See `experiments/README.md` for dataset guidance and
+`experiments/tuning_methodology.md` for the tuning protocol. See
 `experiments/final_benchmark_summary.md` for the current repo conclusion.
+For a single merged handoff brief that combines both tuning methodology and
+final benchmark evidence, read `experiments/report_handoff.md`.
 For robustness/failure analysis, see `experiments/risk_failure_analysis.md`.
 Use `--dry-run` to validate configs/dataset/output plumbing without loading
 MediaPipe models.
 
-Current laptop benchmark winner: EfficientDet Lite0 int8 with
+Dataset-prep helpers such as `prepare_public_subset.py`,
+`prepare_robustness_subset.py`, `prepare_external_subset.py`, and
+`capture_real_camera_frames.py` are kept as support scripts. They are not part
+of the main measurement flow.
+
+Current tuned benchmark winner: EfficientDet Lite0 int8 with
 `SCORE_THRESHOLD = 0.35` and `MAX_RESULTS = 15`.
 The current production candidate also enables inference preprocessing and keeps
 short-lived alerts through brief detector misses for noisy/occluded streams.
@@ -97,6 +96,43 @@ When the dashboard is running, collect stream metrics with:
 ```bash
 python benchmark_stream.py --server-url http://127.0.0.1:5000 --duration 60
 ```
+
+To produce report-ready metrics in one run, keep the dashboard server running
+and run:
+
+```bash
+python benchmark/record_metrics.py \
+  --dataset /data/dadn-public-subset/images \
+  --labels /data/dadn-public-subset/labels.json \
+  --server-url http://127.0.0.1:5000 \
+  --runs 3 \
+  --warmup 10 \
+  --duration 60 \
+  --interval 1
+```
+
+The wrapper writes `metrics_summary.json` and `metrics_summary.md` under
+`experiments/results/<timestamp>-record-metrics/`. Latency is reported as
+`server_side_alert_latency_ms`, not full camera-to-audio end-to-end latency.
+
+To run the detector/config sweep and keep the dataset/config/result trace
+together:
+
+```bash
+python experiments/run_tuning_sweep.py \
+  --dataset /data/dadn-public-subset/images \
+  --labels /data/dadn-public-subset/labels.json \
+  --min-frames 200 \
+  --min-labeled-frames 200
+```
+
+For ESP32-CAM capture-resolution reporting, use
+`benchmark/esp32_resolution_sweep.py` to flash QVGA/VGA/SVGA/XGA/SXGA/UXGA
+presets and record runtime metrics on the real Raspberry Pi pipeline.
+
+Use public datasets as offline validation only; final claims should also include
+synthetic robustness and real ESP32-CAM review frames because public images are
+not i.i.d. with the live camera stream.
 
 ## Raspberry Pi edge test suite
 

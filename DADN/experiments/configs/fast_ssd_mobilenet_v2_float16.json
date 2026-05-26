@@ -1,6 +1,6 @@
 {
   "experiment_id": "fast_ssd_mobilenet_v2_float16",
-  "description": "Fast lightweight candidate for laptop-first benchmark.",
+  "description": "Fast lightweight candidate for offline benchmark.",
   "detector": {
     "model_id": "ssd_mobilenet_v2_float16",
     "score_threshold": 0.45,

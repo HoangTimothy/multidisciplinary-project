@@ -73,6 +73,31 @@ static const int SERVER_PORT = 5000;
 #define DADN_FRAME_DELAY_MS 15
 #endif
 
+#ifndef DADN_CAMERA_FRAME_SIZE
+#define DADN_CAMERA_FRAME_SIZE FRAMESIZE_QVGA
+#endif
+
+static const char *cameraFrameSizeLabel(framesize_t frame_size)
+{
+  switch (frame_size)
+  {
+  case FRAMESIZE_QVGA:
+    return "QVGA (320x240)";
+  case FRAMESIZE_VGA:
+    return "VGA (640x480)";
+  case FRAMESIZE_SVGA:
+    return "SVGA (800x600)";
+  case FRAMESIZE_XGA:
+    return "XGA (1024x768)";
+  case FRAMESIZE_SXGA:
+    return "SXGA (1280x1024)";
+  case FRAMESIZE_UXGA:
+    return "UXGA (1600x1200)";
+  default:
+    return "UNKNOWN";
+  }
+}
+
 // Streaming + GPIO config
 #define STREAM_PORT 8081
 #define STATUS_LED 33
@@ -107,7 +132,7 @@ bool initCamera()
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG;
-  config.frame_size = FRAMESIZE_QVGA;
+  config.frame_size = DADN_CAMERA_FRAME_SIZE;
   config.jpeg_quality = DADN_JPEG_QUALITY;
   config.fb_count = 2;
   config.fb_location = CAMERA_FB_IN_PSRAM;
@@ -121,9 +146,10 @@ bool initCamera()
   }
 
   sensor_t *s = esp_camera_sensor_get();
-  s->set_framesize(s, FRAMESIZE_QVGA);
+  s->set_framesize(s, DADN_CAMERA_FRAME_SIZE);
   s->set_vflip(s, DADN_CAMERA_VFLIP);
   s->set_hmirror(s, DADN_CAMERA_HMIRROR);
+  Serial.printf("[INFO] Camera frame size=%s\n", cameraFrameSizeLabel(DADN_CAMERA_FRAME_SIZE));
   Serial.printf("[INFO] Camera orientation vflip=%d hmirror=%d\n", DADN_CAMERA_VFLIP, DADN_CAMERA_HMIRROR);
   Serial.printf("[INFO] Camera jpeg_quality=%d frame_delay_ms=%d\n", DADN_JPEG_QUALITY, DADN_FRAME_DELAY_MS);
   Serial.println("[INFO] Camera initialized");

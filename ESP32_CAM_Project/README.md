@@ -56,6 +56,27 @@ D:\DADN\venv\Scripts\python.exe configure_esp32_wifi.py --ssid "YOUR_2G_WIFI" --
 This writes `include/wifi_credentials.h`, then optionally uploads the firmware.
 You can also copy `include/wifi_credentials.example.h` manually.
 
+You can also choose the capture resolution at the same time:
+
+```powershell
+D:\DADN\venv\Scripts\python.exe configure_esp32_wifi.py --ssid "YOUR_2G_WIFI" --password "YOUR_WIFI_PASSWORD" --frame-size VGA --upload --upload-port <COM_PORT>
+```
+
+Supported values are:
+
+| Resolution | Dimensions |
+| --- | --- |
+| `QVGA` | `320x240` |
+| `VGA` | `640x480` |
+| `SVGA` | `800x600` |
+| `XGA` | `1024x768` |
+| `SXGA` | `1280x1024` |
+| `UXGA` | `1600x1200` |
+
+The current firmware default is `QVGA`, but the camera hardware supports the
+higher modes above. Higher resolutions usually need more PSRAM/bandwidth and
+should be benchmarked on the real setup instead of assumed to be better.
+
 ```cpp
 #define DADN_WIFI_CANDIDATES { \
   {"YOUR_WIFI_SSID", "YOUR_WIFI_PASSWORD"} \
@@ -160,6 +181,25 @@ laptop and ESP32-CAM on the same router, and tune:
 
 Higher JPEG quality values produce smaller/lower-quality frames. Lower
 `DADN_FRAME_DELAY_MS` reduces latency but increases WiFi and ESP32 load.
+
+## Resolution sweep for reporting
+
+Use the DADN benchmark sweep script when you want a transparent comparison of
+ESP32-CAM capture sizes on the real Raspberry Pi + DADN pipeline:
+
+```bash
+python ../DADN/benchmark/esp32_resolution_sweep.py \
+  --ssid "YOUR_2G_WIFI" \
+  --password "YOUR_WIFI_PASSWORD" \
+  --upload-port <COM_PORT> \
+  --serial-port <COM_PORT>
+```
+
+This script flashes each resolution preset, reads the stream URL from the
+ESP32 serial log, starts the DADN server, and records runtime metrics for each
+resolution into `DADN/experiments/results/<timestamp>-esp32-resolution-sweep/`.
+If you already have a fixed ESP32 stream URL or a stable ESP32 IP, you can pass
+`--camera-url` or `--esp32-ip` to skip serial discovery.
 
 ## Board
 - Board: `esp32cam` (AI Thinker ESP32-CAM)

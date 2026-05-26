@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from camera_profiles import frame_size_label, frame_size_macro, normalize_frame_size
+
 
 PROJECT_DIR = Path(__file__).resolve().parent
 CREDENTIALS_PATH = PROJECT_DIR / "include" / "wifi_credentials.h"
@@ -20,6 +22,7 @@ def write_credentials(
     ssid: str,
     password: str,
     server_ip: str,
+    frame_size: str,
     *,
     vflip: bool,
     hmirror: bool,
@@ -40,6 +43,7 @@ def write_credentials(
                 "}",
                 "",
                 f"#define DADN_SERVER_IP {c_string(server_ip)}",
+                f"#define DADN_CAMERA_FRAME_SIZE {frame_size_macro(frame_size)}",
                 f"#define DADN_ENABLE_SERVER_HEALTH_CHECK {1 if enable_health_check else 0}",
                 f"#define DADN_CAMERA_VFLIP {1 if vflip else 0}",
                 f"#define DADN_CAMERA_HMIRROR {1 if hmirror else 0}",
@@ -65,6 +69,11 @@ def main() -> int:
     parser.add_argument("--ssid", required=True, help="2.4 GHz WiFi SSID reachable by ESP32-CAM")
     parser.add_argument("--password", required=True, help="WiFi password")
     parser.add_argument("--server-ip", default="192.168.1.100", help="DADN/API server IP used by ESP32 health checks")
+    parser.add_argument(
+        "--frame-size",
+        default="QVGA",
+        help="ESP32-CAM capture resolution. Supported: QVGA/VGA/SVGA/XGA/SXGA/UXGA or dimensions like 640x480",
+    )
     parser.add_argument("--vflip", action="store_true", help="Flip camera vertically")
     parser.add_argument("--hmirror", action="store_true", help="Mirror camera horizontally")
     parser.add_argument("--stream-timeout-ms", type=int, default=300000, help="Stop each MJPEG client after N ms. 0 means no timeout.")
@@ -75,11 +84,17 @@ def main() -> int:
     parser.add_argument("--upload-port", default=None, help="Upload serial port, e.g. COM13")
     args = parser.parse_args()
 
+    try:
+        frame_size = normalize_frame_size(args.frame_size)
+    except ValueError as exc:
+        parser.error(str(exc))
+
     write_credentials(
         CREDENTIALS_PATH,
         args.ssid,
         args.password,
         args.server_ip,
+        frame_size,
         vflip=args.vflip,
         hmirror=args.hmirror,
         stream_timeout_ms=args.stream_timeout_ms,
@@ -88,6 +103,7 @@ def main() -> int:
         enable_health_check=args.enable_health_check,
     )
     print(f"[SUCCESS] Wrote local WiFi credentials: {CREDENTIALS_PATH}")
+    print(f"[INFO] Camera capture frame size: {frame_size_label(frame_size)}")
     print("[INFO] This file is gitignored and will not be committed.")
 
     if args.upload:

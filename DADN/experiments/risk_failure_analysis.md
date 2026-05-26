@@ -23,18 +23,11 @@ cover many real indoor obstacles such as fans or partially visible furniture.
 
 ## Robustness benchmark
 
-Create synthetic stress cases from an existing labeled image subset:
+Create synthetic stress cases from an existing labeled image subset with the
+support script `prepare_robustness_subset.py`. This is a one-time data
+construction step, not the measurement entrypoint.
 
-```bash
-python DADN/experiments/prepare_robustness_subset.py \
-  --input /data/dadn-public-subset/images \
-  --labels /data/dadn-public-subset/labels.json \
-  --output /data/dadn-robustness/images \
-  --labels-out /data/dadn-robustness/labels.json \
-  --max-images 50
-```
-
-Run the benchmark against the same production candidate:
+Run the benchmark against the prepared robustness set:
 
 ```bash
 python DADN/benchmark_inference.py \
@@ -51,18 +44,9 @@ Use `risk_alert_correctness` as the primary metric. Use
 
 ## Real camera review set
 
-Capture a small review set from the ESP32-CAM local stream:
-
-```bash
-python DADN/experiments/capture_real_camera_frames.py \
-  --camera-url http://192.168.1.11:8081/stream \
-  --output /data/dadn-real-camera/images \
-  --labels-out /data/dadn-real-camera/labels.json \
-  --frames 60 \
-  --interval-seconds 0.5 \
-  --expected-alert \
-  --failure-type real_camera_occlusion_noise
-```
+Capture a small review set from the ESP32-CAM local stream with the support
+script `capture_real_camera_frames.py`. This is one-time data collection for
+manual review, not the benchmark measurement itself.
 
 Review/edit the generated labels before using them as final evidence. Do not
 commit raw private frames; commit only the summarized failure analysis.
@@ -100,7 +84,7 @@ Overall:
 - `detection_rate`: 0.868
 - `alert_rate`: 0.800
 - `false_alert_rate`: 0.000 on this positive-only robustness set
-- `p95_latency_ms`: 35.4 ms on laptop
+- `p95_latency_ms`: 35.4 ms on the offline benchmark host
 
 Interpretation:
 
@@ -140,9 +124,9 @@ Overall after tuning:
 - `alert_correctness`: 0.692, up from 0.685
 - `detection_rate`: 0.901, up from 0.868
 - `alert_rate`: 0.816, up from 0.800
-- `p95_latency_ms`: 33.2 ms on laptop
+- `p95_latency_ms`: 33.2 ms on the offline benchmark host
 
-This tune is worth keeping for the laptop/edge candidate because it improves
+This tune is worth keeping for the edge candidate because it improves
 missed-alert robustness without increasing measured p95 latency on the synthetic
 set. The remaining weakest cases are still center occlusion and noise.
 
@@ -171,7 +155,7 @@ Overall after preprocessing/smoothing:
 - `risk_alert_correctness`: 0.827, up from 0.816 after threshold tuning
 - `alert_correctness`: 0.702, up from 0.692
 - `detection_rate`: 0.911, up from 0.901
-- `p95_latency_ms`: 35.6 ms on laptop
+- `p95_latency_ms`: 35.6 ms on the offline benchmark host
 
 The synthetic image benchmark mainly measures preprocessing because frames are
 independent still images; temporal smoothing should be validated on a real
@@ -207,11 +191,11 @@ Interpretation:
 
 - Removing easy samples makes the weakness visible: current Lite0 drops to
   0.756 on occlusion and 0.858 on motion blur.
-- Aggressive Lite0 tuning improves both hard cases without a laptop latency
+- Aggressive Lite0 tuning improves both hard cases without an offline latency
   penalty, but this hard-only set is positive-only, so it cannot measure false
   alert spam.
 - Lite2 int8 is the best accuracy probe, especially for occlusion, but its p95
-  latency is over 2x Lite0 on laptop, so it should not replace Lite0 for the
+  latency is over 2x Lite0 on the offline benchmark host, so it should not replace Lite0 for the
   edge candidate unless Raspberry Pi tests show enough headroom.
 - If real ESP32 negative/non-obstacle frames show acceptable spam, promote
   `hard_recall_lite0_int8`; otherwise keep it as a hard-case diagnostic config.
@@ -226,7 +210,7 @@ Three assistive/navigation-oriented datasets were checked for DADN integration:
 | GuideDog | Hugging Face gated; access is auto-approved after accepting terms; image + bbox fields available in `object`/`depth` configs | Use for egocentric BLV street-view risk benchmark after HF login |
 | HRBUST-LLPED | Good low-light wearable pedestrian candidate; stable direct download/schema not wired yet | Use later for low-light pedestrian robustness when files are available |
 
-Implemented `DADN/experiments/prepare_external_subset.py`:
+Implemented an external-dataset adapter:
 
 - `zenodo-sensor` downloads/summarizes Zenodo sensor CSV into a DADN-style
   risk manifest.
@@ -268,9 +252,9 @@ GuideDog run attempt:
 - A Hugging Face token was provided and authenticated successfully.
 - The account still does not have dataset access for `kjunh/GuideDog`; the Hub
   returned a gated dataset error asking to request access on the dataset page.
-- `prepare_external_subset.py` now passes `HF_TOKEN` explicitly to
+- The external-dataset adapter now passes `HF_TOKEN` explicitly to
   `load_dataset`, so after the dataset terms are accepted in the browser, the
-  same command can prepare the image subset without code changes.
+  same adapter path can prepare the image subset without code changes.
 
 HRBUST-LLPED run attempt:
 

@@ -16,11 +16,17 @@ Start with datasets that include pedestrian-facing safety classes:
 - Open Images subset: useful when filtering many object categories such as
   people, bags, furniture, bicycles, and vehicles.
   Source: https://storage.googleapis.com/openimages/web/index.html
-- A small DADN demo set: 5-10 short videos from laptop/ESP32 in corridors,
+- A small DADN demo set: 5-10 short videos from a local camera/ESP32 in corridors,
   campus walkways, sidewalks, and indoor obstacle scenes.
 
 Model candidates are from the MediaPipe Object Detector task guide:
 https://ai.google.dev/edge/mediapipe/solutions/vision/object_detector
+
+See `tuning_methodology.md` for the full detector/runtime/Decision Engine
+tuning protocol and the distinction between benchmark-driven and heuristic
+parameters.
+If you need one consolidated file to hand to another agent or to turn into the
+formal report, read `report_handoff.md`.
 
 The open datasets are useful for model sanity. For a production handoff, keep
 the raw COCO/BDD images outside Git, generate a small labeled subset locally,
@@ -29,17 +35,10 @@ and commit only the final benchmark summary.
 ## Collision-risk robustness subset
 
 For DADN, the main production question is whether a risky obstacle triggers an
-alert, not whether the object name is perfect. Build a synthetic robustness set
-from the labeled public subset to stress ESP32-like conditions:
-
-```bash
-python DADN/experiments/prepare_robustness_subset.py \
-  --input /data/dadn-public-subset/images \
-  --labels /data/dadn-public-subset/labels.json \
-  --output /data/dadn-robustness/images \
-  --labels-out /data/dadn-robustness/labels.json \
-  --max-images 50
-```
+alert, not whether the object name is perfect. A synthetic robustness set can
+be derived from an existing labeled public subset with the support script
+`prepare_robustness_subset.py`. The important measurement step is still
+`benchmark_inference.py` on the resulting dataset.
 
 This generates motion blur, noise, low-light, JPEG-compressed, center-occluded,
 and ESP32-resized variants. Use `risk_alert_correctness` as the primary metric;
@@ -55,58 +54,31 @@ Git.
 navigation than generic COCO/BDD.
 
 Zenodo `10781048` is directly downloadable, but it is a sensor-only ultrasonic
-and IMU benchmark rather than camera frames. Use it as collision-risk evidence,
-not as input for `benchmark_inference.py`:
-
-```bash
-python DADN/experiments/prepare_external_subset.py zenodo-sensor \
-  --file Corridor_marked.csv \
-  --output-dir /data/dadn-external/zenodo_10781048 \
-  --labels-out /data/dadn-external/zenodo_10781048/corridor_sensor_manifest.json \
-  --max-rows 500
-```
+and IMU benchmark rather than camera frames. Use it as collision-risk
+evidence, not as input for `benchmark_inference.py`.
 
 GuideDog is useful for egocentric BLV street-view evaluation. It is gated on
 Hugging Face, with auto-approved academic/non-commercial access. After accepting
-the terms and running `huggingface-cli login`, prepare an image subset:
-
-```bash
-python DADN/experiments/prepare_external_subset.py guidedog \
-  --config object \
-  --output-dir /data/dadn-external/guidedog_object/images \
-  --labels-out /data/dadn-external/guidedog_object/labels.json \
-  --max-items 200 \
-  --risk-only
-```
+the terms and running `huggingface-cli login`, the support adapter
+`prepare_external_subset.py` can build an image subset.
 
 HRBUST-LLPED is a good low-light wearable pedestrian candidate, but it is not
 yet wired into this repo because a stable direct download/schema was not found
 from the paper page. Add it through the same adapter style once the dataset
 files are available locally.
 
-## Prepare a COCO + BDD subset
+## Dataset Prep
 
-BDD100K normally requires downloading the dataset through its official access
-flow, so this repository does not auto-download the official release. The final
-laptop run used COCO val2017 annotations plus a BDD100K FiftyOne `samples.json`
-mirror. Generate a reproducible 200-500 item subset with:
+`prepare_public_subset.py`, `prepare_robustness_subset.py`,
+`prepare_external_subset.py`, and `capture_real_camera_frames.py` are support
+scripts for one-time dataset construction and review labeling. They are kept in
+the repo for reproducibility, but they are not measurement entrypoints. The
+main measurement scripts are `benchmark_inference.py`, `benchmark_stream.py`,
+`record_metrics.py`, and `run_tuning_sweep.py`.
 
-```bash
-python DADN/experiments/prepare_public_subset.py \
-  --coco-annotations /data/coco/annotations/instances_val2017.json \
-  --bdd-fiftyone-samples /data/bdd100k/samples.json \
-  --bdd-hf-repo dgural/bdd100k \
-  --output-dir /data/dadn-public-subset/images \
-  --labels-out /data/dadn-public-subset/labels.json \
-  --max-coco 250 \
-  --max-bdd 250 \
-  --label-detail group
-```
-
-The helper selects labels relevant to DADN (`person`, vehicles, and static
-obstacles). By default it emits group-level labels, which are the right choice
-for public COCO/BDD model selection; use `--label-detail all` only for
-diagnostic runs where approximate zone/distance labels are useful.
+When you report results, describe the dataset source and the measurement script
+separately. The reader should be able to tell which part constructs the data
+and which part measures the system.
 
 ## Minimal labels format
 
