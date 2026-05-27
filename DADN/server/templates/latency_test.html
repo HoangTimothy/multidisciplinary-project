@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DADN Latency Test</title>
+    <style>
+        :root {
+            --bg: #071013;
+            --panel: #102027;
+            --panel-2: #162f38;
+            --text: #eef8f6;
+            --muted: #a9c4bf;
+            --accent: #2fe6a1;
+            --warn: #ffcf5a;
+            --danger: #ff6b6b;
+            --line: rgba(255, 255, 255, 0.12);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            color: var(--text);
+            font-family: "Aptos", "Segoe UI", sans-serif;
+            background:
+                radial-gradient(circle at top left, rgba(47, 230, 161, 0.18), transparent 32rem),
+                linear-gradient(135deg, #071013 0%, #0e1f28 55%, #091014 100%);
+        }
+
+        main {
+            width: min(1120px, calc(100vw - 32px));
+            margin: 0 auto;
+            padding: 32px 0;
+        }
+
+        h1 {
+            margin: 0 0 8px;
+            font-size: clamp(2rem, 5vw, 4rem);
+            letter-spacing: -0.05em;
+        }
+
+        p {
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1.1fr 0.9fr;
+            gap: 18px;
+            margin-top: 24px;
+        }
+
+        .card {
+            border: 1px solid var(--line);
+            border-radius: 22px;
+            background: rgba(16, 32, 39, 0.86);
+            box-shadow: 0 20px 70px rgba(0, 0, 0, 0.28);
+            padding: 22px;
+        }
+
+        .button-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin: 20px 0;
+        }
+
+        button {
+            border: 0;
+            border-radius: 16px;
+            color: #04100d;
+            cursor: pointer;
+            font-weight: 800;
+            padding: 16px 20px;
+            transition: transform 120ms ease, opacity 120ms ease;
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.45;
+            transform: none;
+        }
+
+        .primary {
+            background: var(--accent);
+            font-size: 1.05rem;
+        }
+
+        .secondary {
+            background: var(--warn);
+        }
+
+        .ghost {
+            background: #d9ece8;
+        }
+
+        .status {
+            border-radius: 18px;
+            background: var(--panel-2);
+            border: 1px solid var(--line);
+            margin-top: 16px;
+            min-height: 92px;
+            padding: 18px;
+        }
+
+        .status strong {
+            color: var(--accent);
+            display: block;
+            font-size: 1.35rem;
+            margin-bottom: 6px;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        th,
+        td {
+            border-bottom: 1px solid var(--line);
+            padding: 10px 8px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        th {
+            color: var(--accent);
+            font-size: 0.85rem;
+            text-transform: uppercase;
+        }
+
+        code {
+            color: var(--accent);
+        }
+
+        .metric {
+            display: grid;
+            gap: 12px;
+            grid-template-columns: repeat(2, 1fr);
+            margin-top: 16px;
+        }
+
+        .metric div {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            padding: 14px;
+        }
+
+        .metric span {
+            color: var(--muted);
+            display: block;
+            font-size: 0.82rem;
+            margin-bottom: 5px;
+        }
+
+        .metric b {
+            font-size: 1.3rem;
+        }
+
+        @media (max-width: 860px) {
+            .grid,
+            .metric {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <main>
+        <h1>Latency Test</h1>
+        <p>
+            Browser-assisted test for DADN live alerts. Press <code>Start Event</code>
+            at the same moment the object enters the camera view. The page measures
+            alert detection and browser audio playback start.
+        </p>
+
+        <div class="grid">
+            <section class="card">
+                <h2>Run Control</h2>
+                <p>
+                    Recommended protocol: 20-30 events, keep the scene empty between
+                    events, and keep object size/distance stable.
+                </p>
+                <label>
+                    Event count
+                    <input id="target-count" type="number" min="1" max="50" value="21">
+                </label>
+                <div class="button-row">
+                    <button class="ghost" id="audio-btn">Enable Audio</button>
+                    <button class="primary" id="start-btn">Start Event</button>
+                    <button class="secondary" id="reset-btn">Reset Current Event</button>
+                    <button class="ghost" id="save-btn">Save To Server</button>
+                    <button class="ghost" id="download-btn">Download JSON</button>
+                </div>
+                <div class="status" id="status">
+                    <strong>Ready</strong>
+                    Move the object into view and click Start Event at the same moment.
+                </div>
+                <div class="metric">
+                    <div>
+                        <span>Matched events</span>
+                        <b id="matched-count">0</b>
+                    </div>
+                    <div>
+                        <span>Audio-start mean</span>
+                        <b id="audio-mean">N/A</b>
+                    </div>
+                    <div>
+                        <span>Alert-seen mean</span>
+                        <b id="seen-mean">N/A</b>
+                    </div>
+                    <div>
+                        <span>Server latency mean</span>
+                        <b id="server-mean">N/A</b>
+                    </div>
+                </div>
+            </section>
+
+            <section class="card">
+                <h2>Metric Meaning</h2>
+                <p>
+                    <code>trigger_to_audio_playing_ms</code> is the best no-extra-hardware
+                    proxy for full end-to-end latency. It measures from manual trigger to
+                    the browser audio element firing <code>playing</code>.
+                </p>
+                <p>
+                    It still does not prove acoustic output from the physical speaker.
+                    For that final proof, record video/audio and compare frames.
+                </p>
+            </section>
+        </div>
+
+        <section class="card" style="margin-top: 18px;">
+            <h2>Events</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Status</th>
+                        <th>Label</th>
+                        <th>Trigger to alert seen</th>
+                        <th>Trigger to audio playing</th>
+                        <th>Server latency</th>
+                    </tr>
+                </thead>
+                <tbody id="events-body"></tbody>
+            </table>
+        </section>
+    </main>
+
+    <script>
+        const state = {
+            events: [],
+            activeEvent: null,
+            seenAlerts: new Set(),
+            polling: null,
+            audioUnlocked: false,
+            serverSavePath: null,
+        };
+
+        const startBtn = document.getElementById('start-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const audioBtn = document.getElementById('audio-btn');
+        const saveBtn = document.getElementById('save-btn');
+        const downloadBtn = document.getElementById('download-btn');
+        const statusBox = document.getElementById('status');
+        const eventsBody = document.getElementById('events-body');
+
+        function nowMs() {
+            return performance.now();
+        }
+
+        function fmt(value) {
+            return value == null || Number.isNaN(value) ? 'N/A' : `${value.toFixed(1)} ms`;
+        }
+
+        function mean(values) {
+            const valid = values.filter((value) => value != null && !Number.isNaN(value));
+            if (!valid.length) return null;
+            return valid.reduce((sum, value) => sum + value, 0) / valid.length;
+        }
+
+        function alertKey(alert) {
+            return String(alert.timestamp || JSON.stringify(alert));
+        }
+
+        function setStatus(title, detail) {
+            statusBox.innerHTML = `<strong>${title}</strong>${detail}`;
+        }
+
+        function updateSummary() {
+            const matched = state.events.filter((event) => event.status === 'detected');
+            document.getElementById('matched-count').textContent =
+                `${matched.length}/${state.events.length}`;
+            document.getElementById('audio-mean').textContent =
+                fmt(mean(matched.map((event) => event.trigger_to_audio_playing_ms)));
+            document.getElementById('seen-mean').textContent =
+                fmt(mean(matched.map((event) => event.trigger_to_alert_seen_ms)));
+            document.getElementById('server-mean').textContent =
+                fmt(mean(matched.map((event) => event.server_side_alert_latency_ms)));
+        }
+
+        function renderEvents() {
+            eventsBody.innerHTML = state.events.map((event) => `
+                <tr>
+                    <td>${event.index}</td>
+                    <td>${event.status}</td>
+                    <td>${event.label || ''}</td>
+                    <td>${fmt(event.trigger_to_alert_seen_ms)}</td>
+                    <td>${fmt(event.trigger_to_audio_playing_ms)}</td>
+                    <td>${fmt(event.server_side_alert_latency_ms)}</td>
+                </tr>
+            `).join('');
+            updateSummary();
+        }
+
+        async function unlockAudio() {
+            if (state.audioUnlocked) return true;
+            try {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (AudioContextClass) {
+                    const audioContext = new AudioContextClass();
+                    const oscillator = audioContext.createOscillator();
+                    const gain = audioContext.createGain();
+                    gain.gain.value = 0.0001;
+                    oscillator.connect(gain).connect(audioContext.destination);
+                    oscillator.start();
+                    oscillator.stop(audioContext.currentTime + 0.03);
+                    await audioContext.resume();
+                }
+                state.audioUnlocked = true;
+                audioBtn.textContent = 'Audio Enabled';
+                setStatus('Audio enabled', 'Browser audio is primed for the latency test.');
+                return true;
+            } catch (error) {
+                state.audioUnlocked = false;
+                setStatus('Audio unlock failed', String(error));
+                return false;
+            }
+        }
+
+        async function playAlertAudio(text, event) {
+            return new Promise((resolve) => {
+                const audio = new Audio('/tts?text=' + encodeURIComponent(text));
+                let settled = false;
+
+                function finish(status) {
+                    if (settled) return;
+                    settled = true;
+                    event.audio_status = status;
+                    resolve();
+                }
+
+                audio.addEventListener('playing', () => {
+                    event.audio_playing_at_ms = nowMs();
+                    event.trigger_to_audio_playing_ms =
+                        event.audio_playing_at_ms - event.trigger_client_time_ms;
+                    finish('playing');
+                }, { once: true });
+
+                audio.addEventListener('error', () => finish('audio_error'), { once: true });
+
+                audio.play().catch(() => {
+                    if (!window.speechSynthesis) {
+                        finish('audio_play_rejected');
+                        return;
+                    }
+                    const utter = new SpeechSynthesisUtterance(text);
+                    utter.lang = 'vi-VN';
+                    utter.rate = 0.9;
+                    utter.onstart = () => {
+                        event.audio_playing_at_ms = nowMs();
+                        event.trigger_to_audio_playing_ms =
+                            event.audio_playing_at_ms - event.trigger_client_time_ms;
+                        finish('speech_synthesis_start');
+                    };
+                    utter.onerror = () => finish('speech_synthesis_error');
+                    window.speechSynthesis.speak(utter);
+                });
+
+                window.setTimeout(() => finish('audio_timeout'), 8000);
+            });
+        }
+
+        async function pollOnce() {
+            if (!state.activeEvent) return;
+            const response = await fetch('/api/stats', { cache: 'no-store' });
+            const data = await response.json();
+            const alert = data.last_alert;
+            if (!alert) return;
+
+            const key = alertKey(alert);
+            if (state.seenAlerts.has(key)) return;
+            state.seenAlerts.add(key);
+
+            const event = state.activeEvent;
+            event.status = 'detected';
+            event.alert_seen_client_time_ms = nowMs();
+            event.trigger_to_alert_seen_ms =
+                event.alert_seen_client_time_ms - event.trigger_client_time_ms;
+            event.server_alert_timestamp = alert.timestamp;
+            event.server_side_alert_latency_ms =
+                alert.latency_ms ?? data.last_alert_latency_ms ?? null;
+            event.label = alert.label;
+            event.distance = alert.distance;
+            event.zone = alert.zone;
+            event.spoken_text = alert.spoken_text;
+
+            setStatus('Detected', `${alert.label} ${alert.distance} ${alert.zone}`);
+            renderEvents();
+            await playAlertAudio(alert.spoken_text || alert.label || 'Canh bao', event);
+            state.activeEvent = null;
+            stopPolling();
+            renderEvents();
+        }
+
+        function stopPolling() {
+            if (state.polling) {
+                window.clearInterval(state.polling);
+                state.polling = null;
+            }
+        }
+
+        async function primeSeenAlert() {
+            const response = await fetch('/api/stats', { cache: 'no-store' });
+            const data = await response.json();
+            if (data.last_alert) state.seenAlerts.add(alertKey(data.last_alert));
+        }
+
+        async function startEvent() {
+            const target = Number(document.getElementById('target-count').value || 21);
+            if (state.activeEvent) return;
+            if (state.events.length >= target) {
+                setStatus('Target reached', 'Download JSON or increase the event count.');
+                return;
+            }
+
+            await unlockAudio();
+            await primeSeenAlert();
+            const event = {
+                index: state.events.length + 1,
+                status: 'waiting',
+                trigger_wall_time: new Date().toISOString(),
+                trigger_client_time_ms: nowMs(),
+            };
+            state.events.push(event);
+            state.activeEvent = event;
+            renderEvents();
+            setStatus('Waiting for alert', 'Keep the object visible until detection.');
+
+            stopPolling();
+            state.polling = window.setInterval(() => {
+                pollOnce().catch((error) => {
+                    event.last_error = String(error);
+                });
+            }, 100);
+
+            window.setTimeout(() => {
+                if (state.activeEvent === event) {
+                    event.status = 'timeout';
+                    state.activeEvent = null;
+                    stopPolling();
+                    setStatus('Timeout', 'No new alert was detected. Remove object and retry.');
+                    renderEvents();
+                }
+            }, 10000);
+        }
+
+        function resetCurrentEvent() {
+            if (!state.activeEvent) return;
+            state.activeEvent.status = 'cancelled';
+            state.activeEvent = null;
+            stopPolling();
+            setStatus('Reset', 'Current event cancelled. Keep scene empty before retrying.');
+            renderEvents();
+        }
+
+        function buildPayload() {
+            return {
+                created_at: new Date().toISOString(),
+                metric_note: 'Browser-assisted latency. trigger_to_audio_playing_ms is not acoustic speaker proof.',
+                server_save_path: state.serverSavePath,
+                events: state.events,
+                summary: {
+                    events: state.events.length,
+                    detected: state.events.filter((event) => event.status === 'detected').length,
+                    trigger_to_audio_playing_ms_mean: mean(state.events.map((event) => event.trigger_to_audio_playing_ms)),
+                    trigger_to_alert_seen_ms_mean: mean(state.events.map((event) => event.trigger_to_alert_seen_ms)),
+                    server_side_alert_latency_ms_mean: mean(state.events.map((event) => event.server_side_alert_latency_ms)),
+                },
+            };
+        }
+
+        async function saveToServer() {
+            const response = await fetch('/api/latency_results', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(buildPayload()),
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || 'Save failed');
+            }
+            state.serverSavePath = data.path;
+            setStatus('Saved to server', `<code>${data.path}</code>`);
+            return data.path;
+        }
+
+        async function saveAndReport() {
+            try {
+                await saveToServer();
+            } catch (error) {
+                setStatus('Server save failed', String(error));
+            }
+        }
+
+        function downloadJson() {
+            const payload = buildPayload();
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `dadn-browser-latency-${Date.now()}.json`;
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+
+        audioBtn.addEventListener('click', unlockAudio);
+        startBtn.addEventListener('click', startEvent);
+        resetBtn.addEventListener('click', resetCurrentEvent);
+        saveBtn.addEventListener('click', saveAndReport);
+        downloadBtn.addEventListener('click', downloadJson);
+        primeSeenAlert().catch(() => {});
+    </script>
+</body>
+
+</html>

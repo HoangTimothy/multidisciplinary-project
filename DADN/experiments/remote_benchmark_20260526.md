@@ -275,11 +275,44 @@ Protocol:
 
 ### Full camera-to-audio end-to-end latency
 
-There is no fully automatic script for this yet because the metric depends on
-physical timing: object enters camera view, ESP32 capture/encode, Wi-Fi,
-backend inference, browser/TTS, and speaker playback.
+There is now a browser-assisted test page for the closest no-extra-hardware
+measurement:
 
-Recommended manual protocol:
+```text
+http://<PI_LAN_IP>:5000/latency_test
+```
+
+Open the page in the same browser/device that will play the alert audio.
+
+Protocol:
+
+1. Keep the normal dashboard/server running with sound enabled.
+2. Open `/latency_test`.
+3. Click `Enable Audio` once. This primes browser audio and reduces autoplay
+   blocking during the test.
+4. For each event, move the object into the camera view and click `Start Event`
+   at the same moment.
+5. Keep the object visible until the page records a detection or timeout.
+6. Repeat 20-30 events.
+7. Click `Save To Server`; this writes:
+   `DADN/experiments/results/<timestamp>-browser-audio-latency/browser_latency_summary.json`.
+8. Also click `Download JSON` if the browser machine is not the Raspberry Pi.
+
+Report these browser-assisted metrics:
+
+- `trigger_to_alert_seen_ms`: from manual trigger to browser seeing the backend
+  alert via `/api/stats`.
+- `trigger_to_audio_playing_ms`: from manual trigger to the browser audio object
+  firing `playing`, or browser speech synthesis `onstart`.
+- `server_side_alert_latency_ms`: backend queue/process latency from the server.
+
+This is stronger than the terminal-only test because it includes browser polling,
+TTS request/playback setup, and audio playback start. However, it still does not
+prove the exact acoustic moment at the physical speaker.
+
+For the strictest full camera-to-audio number, use a video/audio timing check:
+
+Recommended strict protocol:
 
 1. Run the server and dashboard with QVGA and `sweep_lite0_s040_r10`.
 2. Use one phone camera to record both the ESP32-CAM field of view and the

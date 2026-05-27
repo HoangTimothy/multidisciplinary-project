@@ -6,6 +6,7 @@ Decouples frame acquisition from inference to maintain live stream FPS.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import queue
 import statistics
@@ -13,6 +14,7 @@ import tempfile
 import threading
 import time
 from collections import deque
+from datetime import datetime
 from typing import Optional
 
 import cv2
@@ -22,6 +24,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from core.config import (
     ALERT_PRIORITY_THRESHOLD,
+    BASE_DIR,
     FRAME_HEIGHT,
     FRAME_WIDTH,
     INFERENCE_PREPROCESSING_ENABLED,
@@ -349,6 +352,12 @@ def index():
     )
 
 
+@app.route("/latency_test")
+def latency_test():
+    """Serve browser-assisted end-to-end latency test page."""
+    return render_template("latency_test.html")
+
+
 @app.route("/video_feed")
 def video_feed():
     """Stream processed video with detections."""
@@ -454,6 +463,23 @@ def get_config():
             "inference_preprocessing_enabled": INFERENCE_PREPROCESSING_ENABLED,
         }
     ), 200
+
+
+@app.route("/api/latency_results", methods=["POST"])
+def save_latency_results():
+    """Persist browser-assisted latency test results on the server."""
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({"error": "JSON object payload required"}), 400
+
+    results_dir = BASE_DIR / "experiments" / "results"
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    run_dir = results_dir / f"{timestamp}-browser-audio-latency"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    output_path = run_dir / "browser_latency_summary.json"
+    output_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+
+    return jsonify({"status": "ok", "path": str(output_path)}), 200
 
 
 @app.route("/tts")
